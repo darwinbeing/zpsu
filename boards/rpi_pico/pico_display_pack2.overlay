@@ -31,7 +31,6 @@
 };
 
 &lvgl_button_input {
-    coordinates = <216 10>, <10 10>, <231 10>, <10 10>;
     coordinates = <288 9>, <10 10>, <307 9>, <10 10>;
 };
 
