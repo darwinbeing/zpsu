@@ -13,6 +13,10 @@ on:
         required: true
         default: "1.0"
         type: string
+      ovp_scale_factor:
+        description: "OVP voltage scaling factor (float/int)"
+        required: true
+        default: "0.856"
       text:
         description: "Release Text"
         required: true
@@ -28,7 +32,7 @@ jobs:
   build:
     permissions:
       contents: write  # for actions/upload-release-asset to upload release asset
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         gcc: ['13.2.Rel1']
@@ -40,17 +44,29 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install GNU Arm Embedded Toolchain - ${{ matrix.gcc }}
-        uses: carlosperate/arm-none-eabi-gcc-action@v1.8.2
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
           release: ${{ matrix.gcc }}
           path-env-var: ARM_NONE_EABI_GCC_PATH
       - name: The path will be exported to that environmental variable name
         run: echo "The output path is $ARM_NONE_EABI_GCC_PATH"
+      - name: Calculate final release text
+        id: calc_text
+        run: |
+          OVP=${{ github.event.inputs.ovp_scale_factor }}
+          PSU_OUTPUT=12.3
+          RESULT=$(echo "$PSU_OUTPUT / $OVP" | bc -l)
+          RESULT=$(printf "%.2f" $RESULT)
+          FINAL_TEXT="This is my release text, PSU output voltage: ${RESULT}V"
+          echo "Final text: $FINAL_TEXT"
+          echo "text=$FINAL_TEXT" >> $GITHUB_OUTPUT
       - name: Create Firmware Package
         run: |
           echo "Building Firmware"
           echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
-          brew install ninja ccache dtc
+          # brew install ninja ccache dtc
+          sudo apt update
+          sudo apt install -y ninja-build ccache device-tree-compiler
           pip install west
           west init --mr "${{ inputs.zephyr_tag }}" zephyrproject
           cd zephyrproject
@@ -63,10 +79,10 @@ jobs:
           export GNUARMEMB_TOOLCHAIN_PATH="$arm_none_eabi_gcc_path"
 
           source zephyrproject/zephyr/zephyr-env.sh
-          west build -b rpi_pico -d build_lcd1 -- -DCONFIG_PICO_DISPLAY_PACK=y
-          west build -b rpi_pico -d build_lcd2 -- -DCONFIG_PICO_DISPLAY_PACK2=y
-          west build -b rpi_pico2/rp2350a/m33 -d build_lcd3 -- -DCONFIG_PICO_DISPLAY_PACK=y
-          west build -b rpi_pico2/rp2350a/m33 -d build_lcd4 -- -DCONFIG_PICO_DISPLAY_PACK2=y
+          west build -b rpi_pico -d build_lcd1 -- -DCONFIG_PICO_DISPLAY_PACK=y -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
+          west build -b rpi_pico -d build_lcd2 -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
+          west build -b rpi_pico2/rp2350a/m33 -d build_lcd3 -- -DCONFIG_PICO_DISPLAY_PACK=y -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
+          west build -b rpi_pico2/rp2350a/m33 -d build_lcd4 -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
       - name: Delete existing release and tag
         id: delete-tag-release
         uses: dev-drprasad/delete-tag-and-release@v1.1
@@ -85,6 +101,7 @@ jobs:
           file: build_lcd1/zephyr/zephyr.uf2
           asset_name: zpsu_pico_pdp1.uf2
           overwrite: true
+          prerelease: ${{ inputs.prerelease }}
       - name: Upload Release Zpsu PICO(RP2040) PICO Display Pack2 FW
         uses: svenstaro/upload-release-action@v2
         with:
@@ -95,6 +112,7 @@ jobs:
           file: build_lcd2/zephyr/zephyr.uf2
           asset_name: zpsu_pico_pdp2.uf2
           overwrite: true
+          prerelease: ${{ inputs.prerelease }}
       - name: Upload Release Zpsu PICO2(RP2350) PICO Display Pack FW
         uses: svenstaro/upload-release-action@v2
         with:
@@ -105,13 +123,15 @@ jobs:
           file: build_lcd3/zephyr/zephyr.uf2
           asset_name: zpsu_pico2_pdp1.uf2
           overwrite: true
+          prerelease: ${{ inputs.prerelease }}
       - name: Upload Release Zpsu PICO2(RP2350) PICO Display Pack2 FW
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: "${{ env.VERSION }}"
           release_name: "Release ${{ env.VERSION }}"
-          body: ${{ inputs.text }}
+          body: ${{ steps.calc_text.outputs.text }}
           file: build_lcd4/zephyr/zephyr.uf2
           asset_name: zpsu_pico2_pdp2.uf2
           overwrite: true
+          prerelease: ${{ inputs.prerelease }}

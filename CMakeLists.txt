@@ -9,6 +9,11 @@ elseif(BOARD_NAME STREQUAL "rpi_pico")
     message(STATUS "Compiling for RPI_PICO")
 endif()
 
+if(EXTRA_CFLAGS MATCHES "-DOVP_SCALE_FACTOR=([0-9\\.eE+-]+)")
+  set(OVP_SCALE_FACTOR "${CMAKE_MATCH_1}")
+  message(STATUS "OVP_SCALE_FACTOR = ${OVP_SCALE_FACTOR}")
+endif()
+
 if(CONFIG_PICO_DISPLAY_PACK AND BOARD_NAME STREQUAL "rpi_pico")
   set(DTC_OVERLAY_FILE "boards/rpi_pico/pico_display_pack.overlay")
 elseif(CONFIG_PICO_DISPLAY_PACK2 AND BOARD_NAME STREQUAL "rpi_pico")
