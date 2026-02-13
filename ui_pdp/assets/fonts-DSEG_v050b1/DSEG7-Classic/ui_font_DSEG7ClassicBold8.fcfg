@@ -1,0 +1,16 @@
+{
+  "codename": "DSEG7ClassicBold8",
+  "ttf_path": "/assets/fonts-DSEG_v050b1/DSEG7-Classic/DSEG7Classic-Bold.ttf",
+  "bin_path": "/assets/fonts-DSEG_v050b1/DSEG7-Classic/ui_font_DSEG7ClassicBold8.bin",
+  "c_path": "/assets/fonts-DSEG_v050b1/DSEG7-Classic/ui_font_DSEG7ClassicBold8.c",
+  "cfg_path": "/assets/fonts-DSEG_v050b1/DSEG7-Classic/ui_font_DSEG7ClassicBold8.fcfg",
+  "size": 8,
+  "bpp": 8,
+  "letters": 0,
+  "ranges": [
+    "0x20-0x7f"
+  ],
+  "symbols": "",
+  "customparams": "--no-compress --no-prefilter",
+  "uploaded": false
+}

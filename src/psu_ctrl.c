@@ -254,10 +254,60 @@ void PSUCtrl_CVCC(lv_event_t * e) {
         }
 }
 
+void PSUCtrl_Set_CC(lv_event_t * event) {
+        lv_event_code_t code = lv_event_get_code(event);
+        int val;
+        int ret;
+        float current;
+        char buf[32];
+
+        ret = PSUCtrl_readDPS1200Register(0x1f, &val);
+        if(ret) {
+                return ;
+        }
+
+        current = val * 1.0/265;
+
+        if (code == LV_EVENT_KEY) {
+                uint32_t key = lv_event_get_key(event); // Retrieve the pressed key
+                if (key == LV_KEY_UP) {
+                        current += 0.1;
+                } else if (key == LV_KEY_DOWN) {
+                        current -= 0.1;
+                }
+
+        } else if(code == LV_EVENT_LONG_PRESSED || code == LV_EVENT_LONG_PRESSED_REPEAT) {
+                uint32_t key = lv_event_get_key(event);
+                if(key == LV_KEY_UP) current = +5;
+                else if(key == LV_KEY_DOWN) current = -5;
+        }
+
+        if(current < 5) {
+                current = 5;
+        }
+
+        if(current > 100) {
+                current = 100;
+        }
+
+        val = (uint16_t)(current * 265);
+        snprintf(buf, sizeof(buf), "%.1f", current);
+
+        PSUCtrl_writeDPS1200(0x3e, val);
+        ret = PSUCtrl_readDPS1200Register(0x1f, &val);
+        if(!ret) {
+        }
+
+        lv_label_set_text(ui_lblPsuCc, buf);
+
+}
+
 int PSUCtrl_UI_Init()
 {
         int val;
         int ret;
+        float current = 20;
+        char buf[32];
 
         ret = PSUCtrl_readDPS1200Register(0x21, &val);
         if(!ret) {
@@ -272,6 +322,16 @@ int PSUCtrl_UI_Init()
                         lv_label_set_text(ui_LabelCVCC, "CV");
                 }
         }
+
+        val = (uint16_t)(current * 265);
+        snprintf(buf, sizeof(buf), "%.1f", current);
+
+        PSUCtrl_writeDPS1200(0x3e, val);
+        ret = PSUCtrl_readDPS1200Register(0x1f, &val);
+        if(!ret) {
+                lv_label_set_text(ui_lblPsuCc, buf);
+        }
+
         return 0;
 }
 

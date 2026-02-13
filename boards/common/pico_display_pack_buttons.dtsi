@@ -11,7 +11,7 @@
         button1: button_B {
             gpios = <&gpio0 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
             label = "Push button B";
-            zephyr,code = <INPUT_KEY_2>;
+            zephyr,code = <INPUT_KEY_UP>;
         };
 
         button2: button_X {
@@ -23,7 +23,7 @@
         button3: button_Y {
             gpios = <&gpio0 15 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
             label = "Push button Y";
-            zephyr,code = <INPUT_KEY_4>;
+            zephyr,code = <INPUT_KEY_DOWN>;
         };
     };
 };

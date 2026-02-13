@@ -6,6 +6,7 @@
 #include <zephyr/dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>
 #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/lvgl/lvgl.h>
 
 #include "../common/pico_display_pack2_lcd.dtsi"
 #include "../common/pico_display_pack_buttons.dtsi"
@@ -31,7 +32,7 @@
 };
 
 &lvgl_button_input {
-    coordinates = <288 9>, <10 10>, <307 9>, <10 10>;
+    coordinates = <288 9>, <307 9>;
 };
 
 &zephyr_udc0 {
