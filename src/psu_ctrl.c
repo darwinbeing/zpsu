@@ -271,9 +271,9 @@ void PSUCtrl_Set_CC(lv_event_t * event) {
         if (code == LV_EVENT_KEY) {
                 uint32_t key = lv_event_get_key(event); // Retrieve the pressed key
                 if (key == LV_KEY_UP) {
-                        current += 0.1;
+                        current += 0.5;
                 } else if (key == LV_KEY_DOWN) {
-                        current -= 0.1;
+                        current -= 0.5;
                 }
 
         } else if(code == LV_EVENT_LONG_PRESSED || code == LV_EVENT_LONG_PRESSED_REPEAT) {
@@ -282,13 +282,13 @@ void PSUCtrl_Set_CC(lv_event_t * event) {
                 else if(key == LV_KEY_DOWN) current = -5;
         }
 
-        if(current < 5) {
-                current = 5;
-        }
+        // if(current < 5) {
+        //         current = 5;
+        // }
 
-        if(current > 100) {
-                current = 100;
-        }
+        // if(current > 100) {
+        //         current = 100;
+        // }
 
         val = (uint16_t)(current * 265);
         snprintf(buf, sizeof(buf), "%.1f", current);
