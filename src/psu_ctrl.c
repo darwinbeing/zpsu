@@ -195,8 +195,13 @@ int PSUCtrl_writeDPS1200(uint8_t reg, int value) {
         return PSUCtrl_writeVar(address_, writeInts, 4);
 }
 
+int PSUCtrl_writeDPS1200Register(uint8_t reg, int value)
+{
+        return PSUCtrl_writeDPS1200(reg << 1, value);
+}
+
 int PSUCtrl_forceFanRPM(int rpm) {
-        PSUCtrl_writeDPS1200(0x40,rpm);
+        PSUCtrl_writeDPS1200Register(0x20,rpm);
         return 0;
 }
 
@@ -213,7 +218,7 @@ void PSUCtrl_ONOFF(lv_event_t * e) {
                         return ;
                 }
                 val ^= 1 << 15;
-                PSUCtrl_writeDPS1200(0x42, val);
+                PSUCtrl_writeDPS1200Register(0x21, val);
                 ret = PSUCtrl_readDPS1200Register(0x21, &val);
                 if(!ret) {
                         if( val & (1 << 15)) {
@@ -240,7 +245,7 @@ void PSUCtrl_CVCC(lv_event_t * e) {
                         return ;
                 }
                 val ^= 1;
-                PSUCtrl_writeDPS1200(0x42, val);
+                PSUCtrl_writeDPS1200Register(0x21, val);
                 ret = PSUCtrl_readDPS1200Register(0x21, &val);
                 if(!ret) {
                         if(val & 0x1) {
@@ -293,7 +298,7 @@ void PSUCtrl_Set_CC(lv_event_t * event) {
         val = (uint16_t)(current * 265);
         snprintf(buf, sizeof(buf), "%.1f", current);
 
-        PSUCtrl_writeDPS1200(0x3e, val);
+        PSUCtrl_writeDPS1200Register(0x1f, val);
         ret = PSUCtrl_readDPS1200Register(0x1f, &val);
         if(!ret) {
         }
@@ -326,7 +331,7 @@ int PSUCtrl_UI_Init()
         val = (uint16_t)(current * 265);
         snprintf(buf, sizeof(buf), "%.1f", current);
 
-        PSUCtrl_writeDPS1200(0x3e, val);
+        PSUCtrl_writeDPS1200Register(0x1f, val);
         ret = PSUCtrl_readDPS1200Register(0x1f, &val);
         if(!ret) {
                 lv_label_set_text(ui_lblPsuCc, buf);
