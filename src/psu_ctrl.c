@@ -114,23 +114,30 @@ int PSUCtrl_readVar(uint8_t address, uint8_t* writeInts, uint32_t writeLen, uint
                 printf("i2c mutex lock failed\n");
                 return -1;
         }
+
         // if (i2c_transfer(i2cdev_, &msgs[0], 2, address)) {
         //         printf("Failed to read variable\n");
         //         k_mutex_unlock(&mutex_);
         //         return -1;
         // }
 
-        if(i2c_write(i2cdev_, writeInts, writeLen, address)) {
-                printf("Failed to write i2c\n");
+        if(i2c_write_read(i2cdev_, address, writeInts, writeLen, data, readCount)) {
+                printf("Failed to operate i2c\n");
                 k_mutex_unlock(&mutex_);
                 return -1;
         }
 
-        if(i2c_read(i2cdev_, data, readCount, address)) {
-                printf("Failed to read i2c\n");
-                k_mutex_unlock(&mutex_);
-                return -2;
-        }
+        // if(i2c_write(i2cdev_, writeInts, writeLen, address)) {
+        //         printf("Failed to write i2c\n");
+        //         k_mutex_unlock(&mutex_);
+        //         return -1;
+        // }
+
+        // if(i2c_read(i2cdev_, data, readCount, address)) {
+        //         printf("Failed to read i2c\n");
+        //         k_mutex_unlock(&mutex_);
+        //         return -2;
+        // }
 
         k_mutex_unlock(&mutex_);
 
@@ -156,28 +163,31 @@ int PSUCtrl_writeVar(uint8_t address, uint8_t* data, uint32_t len) {
         return 0;
 }
 
-int PSUCtrl_readDPS1200(uint8_t reg, uint8_t* data, uint32_t count) {
-        uint8_t cs = reg + (address_ << 1);
-        uint8_t regCS = ((0xff - cs) + 1) & 0xff;
+int PSUCtrl_readDPS1200(uint8_t reg,
+                        uint8_t *data,
+                        uint32_t count)
+{
+    uint16_t sum   = (address_ << 1) + reg;
+    uint8_t cs    = (uint8_t)(-sum);   // 2's complement checksum
 
-        uint8_t writeInts[] = { reg, regCS };
-        return PSUCtrl_readVar(address_, writeInts, 2, data, count);
+    uint8_t tx[2];
+    tx[0] = reg;
+    tx[1] = cs;
+
+    return PSUCtrl_readVar(address_, tx, sizeof(tx), data, count);
 }
 
 int PSUCtrl_readDPS1200Register(uint8_t reg, int *value) {
         uint8_t data[3];
-        int ret = PSUCtrl_readDPS1200(reg<<1, data, 3);	 // if low bit set returns zeros (so use even # cmds)
+        int ret = PSUCtrl_readDPS1200(reg<<1, data, 3);
         if(ret < 0) {
                 return -1;
         }
 
-        int replyCS = 0;
-        for(int i=0; i < sizeof(data); i++) {
-                replyCS+=data[i];
-        }
+        uint16_t sum   = data[0] + data[1];
+        uint8_t cs    = (uint8_t)(-sum);
 
-        replyCS=((0xff-replyCS)+1)&0xff;	//check reply checksum (not really reqd)
-        if(replyCS!=0) {
+        if(cs != data[2]) {
                 printf("Read error");
                 return -2;
         }
@@ -187,12 +197,22 @@ int PSUCtrl_readDPS1200Register(uint8_t reg, int *value) {
 }
 
 int PSUCtrl_writeDPS1200(uint8_t reg, int value) {
-        uint8_t valLSB = value&0xff;
-        uint8_t valMSB=value>>8;
-        uint8_t cs=(address_<<1)+reg+valLSB+valMSB;
-        uint8_t regCS=((0xff-cs)+1)&0xff;
-        uint8_t writeInts[] = {reg,valLSB,valMSB,regCS};
-        return PSUCtrl_writeVar(address_, writeInts, 4);
+        uint8_t payload_lsb = (uint8_t)(value & 0xFF);
+        uint8_t payload_msb = (uint8_t)((value >> 8) & 0xFF);
+
+        uint16_t sum = (address_ << 1) + reg +  payload_lsb + payload_msb;
+
+        uint8_t checksum = (uint8_t)(-sum);
+
+        uint8_t frame[4] = {
+                reg,
+                payload_lsb,
+                payload_msb,
+                checksum
+        };
+
+        return PSUCtrl_writeVar(address_, frame, 4);
+
 }
 
 int PSUCtrl_writeDPS1200Register(uint8_t reg, int value)
@@ -286,14 +306,6 @@ void PSUCtrl_Set_CC(lv_event_t * event) {
                 if(key == LV_KEY_UP) current = +5;
                 else if(key == LV_KEY_DOWN) current = -5;
         }
-
-        // if(current < 5) {
-        //         current = 5;
-        // }
-
-        // if(current > 100) {
-        //         current = 100;
-        // }
 
         val = (uint16_t)(current * 265);
         snprintf(buf, sizeof(buf), "%.1f", current);
