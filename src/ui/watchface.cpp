@@ -9,6 +9,7 @@
 
 #include "ui.h"
 #include "psu_service.h"
+#include "splash.hpp"
 
 LOG_MODULE_REGISTER(watchface_ui, LOG_LEVEL_WRN);
 
@@ -35,6 +36,7 @@ void Watchface::Init() {}
 void Watchface::Show() {
   ui_init();
   psu_ui_init();
+  Splash::Show();
 }
 
 void Watchface::Remove() {}
