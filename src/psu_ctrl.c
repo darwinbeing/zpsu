@@ -44,11 +44,11 @@ int PSUCtrl_init(uint8_t i2cbus, uint8_t address) {
 
         i2cdev_ = dev;
         numReg_ = 0x58 / 2;
-        lastReg_ = (uint16_t *)k_malloc(numReg_);
+        lastReg_ = (uint16_t *)k_malloc(numReg_ * sizeof(uint16_t));
         memset(lastReg_, 0, numReg_ * sizeof(uint16_t));
-        minReg_ = (uint16_t*) k_malloc(numReg_);
+        minReg_ = (uint16_t*) k_malloc(numReg_ * sizeof(uint16_t));
         memset(minReg_, 0xff, numReg_ * sizeof(uint16_t));
-        maxReg_ = (uint16_t*)k_malloc(numReg_);
+        maxReg_ = (uint16_t*)k_malloc(numReg_ * sizeof(uint16_t));
         memset(maxReg_, 0, numReg_ * sizeof(uint16_t));
 
         k_mutex_init(&mutex_);
@@ -427,6 +427,8 @@ int psuctrl_init(void)
         start_time_ms = k_uptime_get();
         PSUCtrl_init(0, 7);
         k_work_schedule(&psuctrl_work, K_MSEC(10));
+
+        return 0;
 }
 
-// SYS_INIT(psuctrl_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+SYS_INIT(psuctrl_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
