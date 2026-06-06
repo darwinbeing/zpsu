@@ -20,7 +20,7 @@
 #include <ram_retention_storage.h>
 #include <events/ble_data_event.h>
 #include <events/accel_event.h>
-#include <notification_manager.h>
+#include "notification_manager.hpp"
 #include <zephyr/zbus/zbus.h>
 #include <zsw_charger.h>
 #include <events/chg_event.h>
@@ -174,7 +174,7 @@ int read_battery(int *batt_mV, int *percent)
 
 void check_notifications(void)
 {
-    uint32_t num_unread = notification_manager_get_num();
+    uint32_t num_unread = notify::NotificationManager::Instance().GetNum();
     ui::Watchface::SetNumNotifications(num_unread);
 }
 
