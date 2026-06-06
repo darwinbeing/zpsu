@@ -1,0 +1,77 @@
+diff --git a/drivers/display/display_st7789v.c b/drivers/display/display_st7789v.c
+index 084d48a3e54..92d57fb6aab 100644
+--- a/drivers/display/display_st7789v.c
++++ b/drivers/display/display_st7789v.c
+@@ -400,6 +400,59 @@ static int st7789v_lcd_init(const struct device *dev)
+ 	return ret;
+ }
+ 
++/* Fill the frame memory with black. The ST7789 GRAM is undefined after
++ * power-up; clearing it here (while the display is still blanked) prevents
++ * random garbage from being shown the first time the panel is un-blanked. */
++static int st7789v_clear(const struct device *dev)
++{
++	const struct st7789v_config *config = dev->config;
++	static const uint8_t zeros[1024u * ST7789V_PIXEL_SIZE] = {0};
++	struct display_buffer_descriptor mipi_desc;
++	enum display_pixel_format pixfmt;
++	int ret;
++
++	/* zeros holds one black row; bail out rather than under-fill if a wider
++	 * panel ever uses this driver. */
++	if (config->width > 1024u) {
++		return -ENOTSUP;
++	}
++
++	if (IS_ENABLED(CONFIG_ST7789V_RGB565)) {
++		pixfmt = PIXEL_FORMAT_RGB_565;
++	} else if (IS_ENABLED(CONFIG_ST7789V_BGR565)) {
++		pixfmt = PIXEL_FORMAT_BGR_565;
++	} else {
++		pixfmt = PIXEL_FORMAT_RGB_888;
++	}
++
++	ret = st7789v_set_mem_area(dev, 0, 0, config->width, config->height);
++	if (ret < 0) {
++		return ret;
++	}
++
++	/* One RAMWR; the GRAM address auto-increments across the window, so the
++	 * black row is streamed once per line (same pattern as st7789v_write). */
++	ret = st7789v_transmit(dev, ST7789V_CMD_RAMWR, NULL, 0);
++	if (ret < 0) {
++		return ret;
++	}
++
++	mipi_desc.width = config->width;
++	mipi_desc.height = 1u;
++	mipi_desc.pitch = config->width;
++	mipi_desc.buf_size = (uint32_t)config->width * ST7789V_PIXEL_SIZE;
++
++	for (uint16_t row = 0u; row < config->height; row++) {
++		ret = mipi_dbi_write_display(config->mipi_dbi, &config->dbi_config,
++					    zeros, &mipi_desc, pixfmt);
++		if (ret < 0) {
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
+ static int st7789v_init(const struct device *dev)
+ {
+ 	const struct st7789v_config *config = dev->config;
+@@ -436,6 +489,12 @@ static int st7789v_init(const struct device *dev)
+ 		return ret;
+ 	}
+ 
++	ret = st7789v_clear(dev);
++	if (ret < 0) {
++		LOG_ERR("Failed to clear display (%d)", ret);
++		return ret;
++	}
++
+ 	return ret;
+ }
+ 
