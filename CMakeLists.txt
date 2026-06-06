@@ -38,6 +38,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/src/ui
   ${PROJECT_SOURCE_DIR}/src/psu
   ${PROJECT_SOURCE_DIR}/src/app
+  ${PROJECT_SOURCE_DIR}/src/clock
   )
 
 set(app_SRCS
@@ -53,7 +54,7 @@ set(app_SRCS
   ${PROJECT_SOURCE_DIR}/src/psu/psu_service.cpp
   ${PROJECT_SOURCE_DIR}/src/psu/psu_channel.c
   ${PROJECT_SOURCE_DIR}/src/psu/psu_controller.cpp
-  ${PROJECT_SOURCE_DIR}/src/clock.c
+  ${PROJECT_SOURCE_DIR}/src/clock/clock.cpp
   ${PROJECT_SOURCE_DIR}/src/notification_manager.c
   ${PROJECT_SOURCE_DIR}/src/main.cpp
   ${PROJECT_SOURCE_DIR}/src/app/app.cpp

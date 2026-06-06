@@ -12,7 +12,7 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/logging/log.h>
 #include <lvgl.h>
-#include <clock.h>
+#include "clock.hpp"
 #include <battery.h>
 #include <heart_rate_sensor.h>
 #include <accelerometer.h>
@@ -79,7 +79,7 @@ void general_work(struct k_work *item)
             break;
         }
         case UPDATE_CLOCK: {
-            struct tm *time = clock_get_time();
+            struct tm *time = timekeeping::Clock::GetTime();
             LOG_INF("%d, %d, %d\n", time->tm_hour, time->tm_min, time->tm_sec);
             ui::Watchface::SetTime(time->tm_hour, time->tm_min, time->tm_sec);
 
@@ -91,7 +91,7 @@ void general_work(struct k_work *item)
             break;
         }
         case UPDATE_DATE: {
-            struct tm *time = clock_get_time();
+            struct tm *time = timekeeping::Clock::GetTime();
             ui::Watchface::SetDate(time->tm_wday, time->tm_mday);
             __ASSERT(0 <= k_work_schedule(&date_work.work, DATE_UPDATE_INTERVAL), "FAIL date_work");
         }
