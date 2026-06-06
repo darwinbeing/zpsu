@@ -29,9 +29,14 @@ project(zpsu-mon)
 
 add_compile_definitions(LV_LVGL_H_INCLUDE_SIMPLE)
 
+if(OVP_SCALE_FACTOR)
+  add_compile_definitions(OVP_SCALE_FACTOR=${OVP_SCALE_FACTOR})
+endif()
+
 include_directories(
   ${PROJECT_SOURCE_DIR}/src
   ${PROJECT_SOURCE_DIR}/src/ui
+  ${PROJECT_SOURCE_DIR}/src/psu
   )
 
 set(app_SRCS
@@ -44,6 +49,7 @@ set(app_SRCS
   ${PROJECT_SOURCE_DIR}/src/ui/fonts/ui_font_DSEG7ClassicBold36.c
   ${PROJECT_SOURCE_DIR}/src/watchface_app.c
   ${PROJECT_SOURCE_DIR}/src/psu_ctrl.c
+  ${PROJECT_SOURCE_DIR}/src/psu/psu_controller.cpp
   ${PROJECT_SOURCE_DIR}/src/clock.c
   ${PROJECT_SOURCE_DIR}/src/notification_manager.c
   ${PROJECT_SOURCE_DIR}/src/main.c
