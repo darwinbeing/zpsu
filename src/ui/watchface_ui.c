@@ -4,6 +4,7 @@
 #include <lvgl.h>
 #include <general_ui.h>
 #include "ui.h"
+#include "psu_service.h"
 #include <zephyr/logging/log.h>
 
 
@@ -27,7 +28,7 @@ void page_event_cb(lv_event_t *e)
 void watchface_show(void)
 {
 	ui_init();
-        PSUCtrl_UI_Init();
+        psu_ui_init();
 }
 
 void watchface_remove(void)

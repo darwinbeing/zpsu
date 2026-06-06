@@ -8,9 +8,9 @@
 lv_obj_t *ui_Screen1 = NULL;lv_obj_t *ui_LabelCurrent = NULL;lv_obj_t *ui_LabelVoltage = NULL;lv_obj_t *ui_LabelEnergy = NULL;lv_obj_t *ui_LabelPower = NULL;lv_obj_t *ui_Label6 = NULL;lv_obj_t *ui_Label5 = NULL;lv_obj_t *ui_Label8 = NULL;lv_obj_t *ui_Label7 = NULL;lv_obj_t *ui_LabelOnOff = NULL;lv_obj_t *ui_LabelCVCC = NULL;lv_obj_t *ui_lblPsuCc = NULL;
 // event funtions
 
-void PSUCtrl_ONOFF(lv_event_t * e);
-void PSUCtrl_CVCC(lv_event_t * e);
-void PSUCtrl_Set_CC(lv_event_t * e);
+void psu_power_toggle_event_cb(lv_event_t * e);
+void psu_mode_toggle_event_cb(lv_event_t * e);
+void psu_current_set_event_cb(lv_event_t * e);
 
 
 void ui_Screen1_screen_init(void)
@@ -173,7 +173,7 @@ lv_obj_set_style_pad_top(ui_LabelOnOff, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_bottom(ui_LabelOnOff, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 lv_obj_add_flag(ui_LabelOnOff, LV_OBJ_FLAG_CLICKABLE);
-lv_obj_add_event_cb(ui_LabelOnOff, PSUCtrl_ONOFF, LV_EVENT_CLICKED, NULL);
+lv_obj_add_event_cb(ui_LabelOnOff, psu_power_toggle_event_cb, LV_EVENT_CLICKED, NULL);
 
 ui_LabelCVCC = lv_label_create(ui_Screen1);
 lv_obj_set_width( ui_LabelCVCC, LV_SIZE_CONTENT);  /// 1
@@ -198,7 +198,7 @@ lv_obj_set_style_pad_top(ui_LabelCVCC, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_bottom(ui_LabelCVCC, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 lv_obj_add_flag(ui_LabelCVCC, LV_OBJ_FLAG_CLICKABLE);
-lv_obj_add_event_cb(ui_LabelCVCC, PSUCtrl_CVCC, LV_EVENT_CLICKED, NULL);
+lv_obj_add_event_cb(ui_LabelCVCC, psu_mode_toggle_event_cb, LV_EVENT_CLICKED, NULL);
 
 ui_lblPsuCc = lv_label_create(ui_Screen1);
 lv_obj_set_width( ui_lblPsuCc, LV_SIZE_CONTENT);  /// 1
@@ -222,9 +222,9 @@ lv_obj_set_style_pad_right(ui_lblPsuCc, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_top(ui_lblPsuCc, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_bottom(ui_lblPsuCc, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-lv_obj_add_event_cb(ui_lblPsuCc, PSUCtrl_Set_CC, LV_EVENT_KEY, NULL);
-// lv_obj_add_event_cb(ui_lblPsuCc, PSUCtrl_Set_CC, LV_EVENT_LONG_PRESSED, NULL);
-// lv_obj_add_event_cb(ui_lblPsuCc, PSUCtrl_Set_CC, LV_EVENT_LONG_PRESSED_REPEAT, NULL);
+lv_obj_add_event_cb(ui_lblPsuCc, psu_current_set_event_cb, LV_EVENT_KEY, NULL);
+// lv_obj_add_event_cb(ui_lblPsuCc, psu_current_set_event_cb, LV_EVENT_LONG_PRESSED, NULL);
+// lv_obj_add_event_cb(ui_lblPsuCc, psu_current_set_event_cb, LV_EVENT_LONG_PRESSED_REPEAT, NULL);
 
 lv_group_t *g = lv_group_create();
 lv_group_set_default(g);

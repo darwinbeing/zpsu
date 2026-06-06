@@ -16,8 +16,7 @@
 #include "ui.h"
 #include <display_control.h>
 #include "watchface_app.h"
-#include "psu_ctrl.h"
-#include "psu_ctrl.h"
+#include "psu_service.h"
 
 // #define LOG_LEVEL CONFIG_LOG_DEFAULT_LEVEL
 // LOG_MODULE_REGISTER(app);
@@ -52,12 +51,12 @@ K_WORK_DEFINE(init_work, run_init_work);
 #define CONFIG_BUTTON_PSUCTRL_STACK_SIZE 1024
 
 // K_THREAD_DEFINE(psuCtrlThreadId, CONFIG_BUTTON_PSUCTRL_STACK_SIZE,
-//                 psuctrl_init, NULL, NULL, NULL, CONFIG_BUTTON_PSUCTRL_THREAD_PRIO, 0, K_TICKS_FOREVER);
+//                 psu_service_init, NULL, NULL, NULL, CONFIG_BUTTON_PSUCTRL_THREAD_PRIO, 0, K_TICKS_FOREVER);
 
 void run_init_work(struct k_work *item)
 {
         pwm_rgb_led_init();
-        // psuctrl_init() is now registered via SYS_INIT() in psu_ctrl.c
+        // psu_service_init() is registered via SYS_INIT() in psu_service.cpp
         // Not to self, PWM consumes like 250uA...
         // Need to disable also when screen is off.
         display_control_init();
