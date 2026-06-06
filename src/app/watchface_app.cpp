@@ -25,7 +25,7 @@
 #include <zsw_charger.h>
 #include <events/chg_event.h>
 #include <events/psuctrl_event.h>
-#include <watchface_ui.h>
+#include "watchface.hpp"
 #include <display_control.h>   // for lvgl_update(); C++ forbids implicit declaration
 
 LOG_MODULE_REGISTER(watcface_app, LOG_LEVEL_WRN);
@@ -71,7 +71,7 @@ void general_work(struct k_work *item)
     switch (the_work->type) {
         case OPEN_WATCHFACE: {
             app::WatchfaceApp::Instance().set_running(true);
-            watchface_show();
+            ui::Watchface::Show();
             lvgl_update();
             /* __ASSERT(0 <= k_work_schedule(&battery_work.work, K_NO_WAIT), "FAIL battery_work"); */
             /* __ASSERT(0 <= k_work_schedule(&clock_work.work, K_NO_WAIT), "FAIL clock_work"); */
@@ -81,7 +81,7 @@ void general_work(struct k_work *item)
         case UPDATE_CLOCK: {
             struct tm *time = clock_get_time();
             LOG_INF("%d, %d, %d\n", time->tm_hour, time->tm_min, time->tm_sec);
-            watchface_set_time(time->tm_hour, time->tm_min, time->tm_sec);
+            ui::Watchface::SetTime(time->tm_hour, time->tm_min, time->tm_sec);
 
             // TODO move from this file
             /* retained.current_time_seconds = clock_get_time_unix(); */
@@ -92,7 +92,7 @@ void general_work(struct k_work *item)
         }
         case UPDATE_DATE: {
             struct tm *time = clock_get_time();
-            watchface_set_date(time->tm_wday, time->tm_mday);
+            ui::Watchface::SetDate(time->tm_wday, time->tm_mday);
             __ASSERT(0 <= k_work_schedule(&date_work.work, DATE_UPDATE_INTERVAL), "FAIL date_work");
         }
         case BATTERY: {
@@ -101,9 +101,9 @@ void general_work(struct k_work *item)
             static uint32_t count;
 
             if (read_battery(&batt_mv, &batt_percent) == 0) {
-                watchface_set_battery_percent(batt_percent, batt_mv);
+                ui::Watchface::SetBatteryPercent(batt_percent, batt_mv);
             }
-            watchface_set_hrm(count % 220);
+            ui::Watchface::SetHrm(count % 220);
             //heart_rate_sensor_fetch(&hr_sample);
             count++;
             __ASSERT(0 <= k_work_schedule(&battery_work.work, BATTERY_INTERVAL),
@@ -175,7 +175,7 @@ int read_battery(int *batt_mV, int *percent)
 void check_notifications(void)
 {
     uint32_t num_unread = notification_manager_get_num();
-    watchface_set_num_notifcations(num_unread);
+    ui::Watchface::SetNumNotifications(num_unread);
 }
 
 void update_ui_from_event(struct k_work *item)
@@ -186,7 +186,7 @@ void update_ui_from_event(struct k_work *item)
                     last_data_update.data.weather.temperature_c, last_data_update.data.weather.humidity, last_data_update.data.weather.weather_code,
                     last_data_update.data.weather.wind,
                     last_data_update.data.weather.wind_direction);
-            watchface_set_weather(last_data_update.data.weather.temperature_c, last_data_update.data.weather.weather_code);
+            ui::Watchface::SetWeather(last_data_update.data.weather.temperature_c, last_data_update.data.weather.weather_code);
         } else if (last_data_update.type == BLE_COMM_DATA_TYPE_SET_TIME) {
             k_work_reschedule(&date_work.work, K_SECONDS(1));
         }
@@ -223,7 +223,7 @@ void WatchfaceApp::Stop() {
   k_work_cancel_delayable_sync(&battery_work.work, &canel_work_sync);
   k_work_cancel_delayable_sync(&clock_work.work, &canel_work_sync);
   k_work_cancel_delayable_sync(&date_work.work, &canel_work_sync);
-  watchface_remove();
+  ui::Watchface::Remove();
 }
 
 void WatchfaceApp::HandleBleComm(const struct zbus_channel* chan) {
@@ -238,7 +238,7 @@ void WatchfaceApp::HandleAccel(const struct zbus_channel* chan) {
   if (running_) {
     struct accel_event* event = (struct accel_event*)zbus_chan_msg(chan);
     if (event->data.type == ACCELEROMETER_EVT_TYPE_STEP) {
-      watchface_set_step(event->data.data.step.count);
+      ui::Watchface::SetStep(event->data.data.step.count);
     }
   }
 }
@@ -254,7 +254,7 @@ void WatchfaceApp::HandleChg(const struct zbus_channel* chan) {
 void WatchfaceApp::HandlePsu(const struct zbus_channel* chan) {
   if (running_) {
     struct psuctrl_data_event* event = (struct psuctrl_data_event*)zbus_chan_msg(chan);
-    watchface_set_ep(event);
+    ui::Watchface::SetEnergyPanel(event);
     lvgl_update();
   }
 }
@@ -266,12 +266,12 @@ void WatchfaceApp::HandleConnected(struct bt_conn* conn, uint8_t err) {
     return;
   }
   __ASSERT(0 <= k_work_schedule(&status_work.work, K_MSEC(1000)), "FAIL status");
-  watchface_set_ble_connected(true);
+  ui::Watchface::SetBleConnected(true);
 }
 
 void WatchfaceApp::HandleDisconnected(struct bt_conn* conn, uint8_t reason) {
   if (!running_) return;
-  watchface_set_ble_connected(false);
+  ui::Watchface::SetBleConnected(false);
 }
 
 }  // namespace app

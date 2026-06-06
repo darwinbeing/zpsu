@@ -42,7 +42,7 @@ include_directories(
 
 set(app_SRCS
   ${PROJECT_SOURCE_DIR}/src/led.c
-  ${PROJECT_SOURCE_DIR}/src/ui/watchface_ui.c
+  ${PROJECT_SOURCE_DIR}/src/ui/watchface.cpp
   ${PROJECT_SOURCE_DIR}/src/ui/screens/ui_Screen1.c
   ${PROJECT_SOURCE_DIR}/src/ui/ui_helpers.c
   ${PROJECT_SOURCE_DIR}/src/ui/ui.c
