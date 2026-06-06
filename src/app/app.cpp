@@ -7,7 +7,7 @@
 #include <zephyr/logging/log.h>
 
 #include "display_control.h"
-#include "watchface_app.h"
+#include "watchface_app.hpp"
 
 LOG_MODULE_REGISTER(app, LOG_LEVEL_WRN);
 
@@ -81,7 +81,7 @@ void App::RunInit() {
     return;
   }
 
-  watchface_app_start(NULL);
+  app::WatchfaceApp::Instance().Start(nullptr);
 }
 
 }  // namespace app

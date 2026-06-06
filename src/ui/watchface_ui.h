@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <events/psuctrl_event.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void watchface_init(void);
 
 void watchface_show(void);
@@ -27,5 +31,9 @@ void watchface_set_weather(int8_t temperature, int weather_code);
 void watchface_set_date(int day_of_week, int date);
 
 void watchface_set_ep(struct psuctrl_data_event *event);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

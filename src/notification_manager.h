@@ -6,6 +6,10 @@
 #define NOTIFICATION_MGR_MAX_FIELD_LEN  50
 #define NOTIFICATION_MANAGER_MAX_STORED 5
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum notification_src {
     NOTIFICATION_SRC_MESSENGER,
     NOTIFICATION_SRC_GMAIL,
@@ -27,5 +31,9 @@ int32_t notification_manager_get(uint32_t id, not_mngr_notification_t *notifcati
 int32_t notification_manager_get_all(not_mngr_notification_t *notifcations, int *num_notifications);
 int32_t notification_manager_get_num(void);
 not_mngr_notification_t *notification_manager_get_newest(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -3,8 +3,16 @@
 #include <inttypes.h>
 #include <time.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void clock_init(uint64_t start_time_seconds);
 struct tm *clock_get_time(void);
 time_t clock_get_time_unix(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -1,4 +1,6 @@
-#include <watchface_ui.h>
+#include "watchface_app.hpp"
+
+#include "watchface_app_hooks.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -23,42 +25,23 @@
 #include <zsw_charger.h>
 #include <events/chg_event.h>
 #include <events/psuctrl_event.h>
+#include <watchface_ui.h>
+#include <display_control.h>   // for lvgl_update(); C++ forbids implicit declaration
 
 LOG_MODULE_REGISTER(watcface_app, LOG_LEVEL_WRN);
 
-static void zbus_ble_comm_data_callback(const struct zbus_channel *chan);
-static void zbus_accel_data_callback(const struct zbus_channel *chan);
-static void zbus_chg_state_data_callback(const struct zbus_channel *chan);
-static void zbus_psuctrl_data_callback(const struct zbus_channel *chan);
-
-ZBUS_CHAN_DECLARE(ble_comm_data_chan);
-ZBUS_LISTENER_DEFINE(watchface_ble_comm_lis, zbus_ble_comm_data_callback);
-
-ZBUS_CHAN_DECLARE(accel_data_chan);
-ZBUS_LISTENER_DEFINE(watchface_accel_lis, zbus_accel_data_callback);
-
-ZBUS_CHAN_DECLARE(chg_state_data_chan);
-ZBUS_LISTENER_DEFINE(watchface_chg_event, zbus_chg_state_data_callback);
-
-ZBUS_CHAN_DECLARE(psuctrl_data_chan);
-ZBUS_LISTENER_DEFINE(watchface_psuctrl_event, zbus_psuctrl_data_callback);
-
 #define WORK_STACK_SIZE 3000
 #define WORK_PRIORITY   5
-
 #define RENDER_INTERVAL_LVGL    K_MSEC(100)
 #define ACCEL_INTERVAL          K_MSEC(100)
 #define BATTERY_INTERVAL        K_MINUTES(1)
-#define SEND_STATUS_INTERVAL    K_SECONDS(30) // TODO move out from here
+#define SEND_STATUS_INTERVAL    K_SECONDS(30)
 #define DATE_UPDATE_INTERVAL    K_MINUTES(1)
 
+namespace {
+
 typedef enum work_type {
-    UPDATE_CLOCK,
-    OPEN_WATCHFACE,
-    BATTERY,
-    SEND_STATUS_UPDATE,
-    PSU_STATUS_UPDATE,
-    UPDATE_DATE
+    UPDATE_CLOCK, OPEN_WATCHFACE, BATTERY, SEND_STATUS_UPDATE, PSU_STATUS_UPDATE, UPDATE_DATE
 } work_type_t;
 
 typedef struct delayed_work_item {
@@ -66,62 +49,20 @@ typedef struct delayed_work_item {
     work_type_t             type;
 } delayed_work_item_t;
 
-void general_work(struct k_work *item);
+void general_work(struct k_work* item);
+void update_ui_from_event(struct k_work* item);
+void check_notifications(void);
+int read_battery(int* batt_mV, int* percent);
 
-static void check_notifications(void);
-static int read_battery(int *batt_mV, int *percent);
-static void update_ui_from_event(struct k_work *item);
-
-static void connected(struct bt_conn *conn, uint8_t err);
-static void disconnected(struct bt_conn *conn, uint8_t reason);
-
-BT_CONN_CB_DEFINE(conn_callbacks) = {
-    .connected    = connected,
-    .disconnected = disconnected,
-};
-
-static delayed_work_item_t battery_work =   { .type = BATTERY };
-static delayed_work_item_t clock_work =     { .type = UPDATE_CLOCK };
-static delayed_work_item_t status_work =    { .type = SEND_STATUS_UPDATE };
-static delayed_work_item_t date_work =      { .type = UPDATE_DATE };
-static delayed_work_item_t psuctrl_work =    { .type = PSU_STATUS_UPDATE };
-
-static delayed_work_item_t general_work_item;
-static struct k_work_sync canel_work_sync;
-
-static K_WORK_DEFINE(update_ui_work, update_ui_from_event);
-static ble_comm_cb_data_t last_data_update;
-
-static bool running;
-
-static int watchface_app_init(const struct device *arg)
-{
-    k_work_init_delayable(&general_work_item.work, general_work);
-    k_work_init_delayable(&battery_work.work, general_work);
-    k_work_init_delayable(&clock_work.work, general_work);
-    k_work_init_delayable(&status_work.work, general_work);
-    k_work_init_delayable(&date_work.work, general_work);
-    /* k_work_init_delayable(&psuctrl_work.work, general_work); */
-    running = false;
-
-    return 0;
-}
-
-void watchface_app_start(lv_group_t *group)
-{
-    general_work_item.type = OPEN_WATCHFACE;
-    // __ASSERT(0 <= k_work_schedule(&general_work_item.work, K_MSEC(100)), "FAIL schedule");
-    __ASSERT(0 <= k_work_schedule(&general_work_item.work, K_NO_WAIT), "FAIL schedule");
-}
-
-void watchface_app_stop(void)
-{
-    running = false;
-    k_work_cancel_delayable_sync(&battery_work.work, &canel_work_sync);
-    k_work_cancel_delayable_sync(&clock_work.work, &canel_work_sync);
-    k_work_cancel_delayable_sync(&date_work.work, &canel_work_sync);
-    watchface_remove();
-}
+delayed_work_item_t battery_work = { .type = BATTERY };
+delayed_work_item_t clock_work   = { .type = UPDATE_CLOCK };
+delayed_work_item_t status_work  = { .type = SEND_STATUS_UPDATE };
+delayed_work_item_t date_work    = { .type = UPDATE_DATE };
+delayed_work_item_t psuctrl_work = { .type = PSU_STATUS_UPDATE };
+delayed_work_item_t general_work_item;
+struct k_work_sync canel_work_sync;
+K_WORK_DEFINE(update_ui_work, update_ui_from_event);
+ble_comm_cb_data_t last_data_update;
 
 void general_work(struct k_work *item)
 {
@@ -129,7 +70,7 @@ void general_work(struct k_work *item)
     delayed_work_item_t *the_work = CONTAINER_OF(dwork, delayed_work_item_t, work);
     switch (the_work->type) {
         case OPEN_WATCHFACE: {
-            running = true;
+            app::WatchfaceApp::Instance().set_running(true);
             watchface_show();
             lvgl_update();
             /* __ASSERT(0 <= k_work_schedule(&battery_work.work, K_NO_WAIT), "FAIL battery_work"); */
@@ -201,7 +142,7 @@ static const struct battery_level_point levels[] = {
     { 0, 3500 },
 };
 
-static int read_battery(int *batt_mV, int *percent)
+int read_battery(int *batt_mV, int *percent)
 {
 #if 0
     int rc = battery_measure_enable(true);
@@ -231,33 +172,15 @@ static int read_battery(int *batt_mV, int *percent)
     return 0;
 }
 
-static void check_notifications(void)
+void check_notifications(void)
 {
     uint32_t num_unread = notification_manager_get_num();
     watchface_set_num_notifcations(num_unread);
 }
 
-static void connected(struct bt_conn *conn, uint8_t err)
+void update_ui_from_event(struct k_work *item)
 {
-    if (!running) return;
-    if (err) {
-        LOG_ERR("Connection failed (err %u)", err);
-        return;
-    }
-    __ASSERT(0 <= k_work_schedule(&status_work.work, K_MSEC(1000)), "FAIL status");
-
-    watchface_set_ble_connected(true);
-}
-
-static void disconnected(struct bt_conn *conn, uint8_t reason)
-{
-    if (!running) return;
-    watchface_set_ble_connected(false);
-}
-
-static void update_ui_from_event(struct k_work *item)
-{
-    if (running) {
+    if (app::WatchfaceApp::Instance().running()) {
         if (last_data_update.type == BLE_COMM_DATA_TYPE_WEATHER) {
             LOG_DBG("Weather: %s t: %d hum: %d code: %d wind: %d dir: %d", last_data_update.data.weather.report_text,
                     last_data_update.data.weather.temperature_c, last_data_update.data.weather.humidity, last_data_update.data.weather.weather_code,
@@ -271,49 +194,99 @@ static void update_ui_from_event(struct k_work *item)
     }
 }
 
-static void zbus_ble_comm_data_callback(const struct zbus_channel *chan)
-{
-	if (running) {
-        struct ble_data_event *event = zbus_chan_msg(chan);
-        // TODO getting this callback again before workqueue has ran will
-        // cause previous to be lost.
-        memcpy(&last_data_update, &event->data, sizeof(ble_comm_cb_data_t));
-        k_work_submit(&update_ui_work);
-    }
+}  // namespace
+
+namespace app {
+
+WatchfaceApp& WatchfaceApp::Instance() {
+  static WatchfaceApp instance;
+  return instance;
 }
 
-static void zbus_accel_data_callback(const struct zbus_channel *chan)
-{
-	if (running) {
-        struct accel_event *event = zbus_chan_msg(chan);
-        if (event->data.type == ACCELEROMETER_EVT_TYPE_STEP) {
-            watchface_set_step(event->data.data.step.count);
-        }
-    }
+void WatchfaceApp::Init() {
+  k_work_init_delayable(&general_work_item.work, general_work);
+  k_work_init_delayable(&battery_work.work, general_work);
+  k_work_init_delayable(&clock_work.work, general_work);
+  k_work_init_delayable(&status_work.work, general_work);
+  k_work_init_delayable(&date_work.work, general_work);
+  running_ = false;
 }
 
-static void zbus_chg_state_data_callback(const struct zbus_channel *chan)
-{
-    if (running) {
-        struct chg_state_event *event = zbus_chan_msg(chan);
-        // TODO Show some nice animation or similar
-        LOG_WRN("CHG: %d", event->is_charging);
-        __ASSERT(0 <= k_work_reschedule(&status_work.work, K_MSEC(10)),
-                     "Failed schedule status work");
-    }
+void WatchfaceApp::Start(lv_group_t* group) {
+  ARG_UNUSED(group);
+  general_work_item.type = OPEN_WATCHFACE;
+  __ASSERT(0 <= k_work_schedule(&general_work_item.work, K_NO_WAIT), "FAIL schedule");
 }
 
-static void zbus_psuctrl_data_callback(const struct zbus_channel *chan)
-{
-    if (running) {
-        struct psuctrl_data_event *event = zbus_chan_msg(chan);
-        // TODO Show some nice animation or similar
-        // LOG_WRN("PSU: %s %s %s %s %d", event->volts, event->amps, event->watts, event->energy, event->is_kWh);
-        /* __ASSERT(0 <= k_work_reschedule(&psuctrl_work.work, K_MSEC(10)), */
-        /*              "Failed schedule status work"); */
-        watchface_set_ep(event);
-        lvgl_update();
-    }
+void WatchfaceApp::Stop() {
+  running_ = false;
+  k_work_cancel_delayable_sync(&battery_work.work, &canel_work_sync);
+  k_work_cancel_delayable_sync(&clock_work.work, &canel_work_sync);
+  k_work_cancel_delayable_sync(&date_work.work, &canel_work_sync);
+  watchface_remove();
 }
 
+void WatchfaceApp::HandleBleComm(const struct zbus_channel* chan) {
+  if (running_) {
+    struct ble_data_event* event = (struct ble_data_event*)zbus_chan_msg(chan);
+    memcpy(&last_data_update, &event->data, sizeof(ble_comm_cb_data_t));
+    k_work_submit(&update_ui_work);
+  }
+}
+
+void WatchfaceApp::HandleAccel(const struct zbus_channel* chan) {
+  if (running_) {
+    struct accel_event* event = (struct accel_event*)zbus_chan_msg(chan);
+    if (event->data.type == ACCELEROMETER_EVT_TYPE_STEP) {
+      watchface_set_step(event->data.data.step.count);
+    }
+  }
+}
+
+void WatchfaceApp::HandleChg(const struct zbus_channel* chan) {
+  if (running_) {
+    struct chg_state_event* event = (struct chg_state_event*)zbus_chan_msg(chan);
+    LOG_WRN("CHG: %d", event->is_charging);
+    __ASSERT(0 <= k_work_reschedule(&status_work.work, K_MSEC(10)), "Failed schedule status work");
+  }
+}
+
+void WatchfaceApp::HandlePsu(const struct zbus_channel* chan) {
+  if (running_) {
+    struct psuctrl_data_event* event = (struct psuctrl_data_event*)zbus_chan_msg(chan);
+    watchface_set_ep(event);
+    lvgl_update();
+  }
+}
+
+void WatchfaceApp::HandleConnected(struct bt_conn* conn, uint8_t err) {
+  if (!running_) return;
+  if (err) {
+    LOG_ERR("Connection failed (err %u)", err);
+    return;
+  }
+  __ASSERT(0 <= k_work_schedule(&status_work.work, K_MSEC(1000)), "FAIL status");
+  watchface_set_ble_connected(true);
+}
+
+void WatchfaceApp::HandleDisconnected(struct bt_conn* conn, uint8_t reason) {
+  if (!running_) return;
+  watchface_set_ble_connected(false);
+}
+
+}  // namespace app
+
+extern "C" {
+void watchface_app_on_ble_comm(const struct zbus_channel* chan) { app::WatchfaceApp::Instance().HandleBleComm(chan); }
+void watchface_app_on_accel(const struct zbus_channel* chan)    { app::WatchfaceApp::Instance().HandleAccel(chan); }
+void watchface_app_on_chg(const struct zbus_channel* chan)      { app::WatchfaceApp::Instance().HandleChg(chan); }
+void watchface_app_on_psu(const struct zbus_channel* chan)      { app::WatchfaceApp::Instance().HandlePsu(chan); }
+void watchface_app_on_connected(struct bt_conn* conn, uint8_t err)       { app::WatchfaceApp::Instance().HandleConnected(conn, err); }
+void watchface_app_on_disconnected(struct bt_conn* conn, uint8_t reason) { app::WatchfaceApp::Instance().HandleDisconnected(conn, reason); }
+}  // extern "C"
+
+static int watchface_app_init(void) {
+  app::WatchfaceApp::Instance().Init();
+  return 0;
+}
 SYS_INIT(watchface_app_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
