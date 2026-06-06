@@ -10,11 +10,6 @@
 
 namespace notify {
 
-NotificationManager& NotificationManager::Instance() {
-  static NotificationManager instance;
-  return instance;
-}
-
 void NotificationManager::Init() {
   memset(notifications_, 0, sizeof(notifications_));
   for (int i = 0; i < NOTIFICATION_MANAGER_MAX_STORED; i++) {

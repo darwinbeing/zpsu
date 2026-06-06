@@ -27,11 +27,6 @@ K_WORK_DEFINE(init_work, RunInitWork);
 
 namespace app {
 
-App& App::Instance() {
-  static App instance;
-  return instance;
-}
-
 void App::Start() {
   // The init code needs stack; reuse the system workqueue for init instead of
   // growing CONFIG_MAIN_STACK_SIZE.

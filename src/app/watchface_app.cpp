@@ -198,11 +198,6 @@ void update_ui_from_event(struct k_work *item)
 
 namespace app {
 
-WatchfaceApp& WatchfaceApp::Instance() {
-  static WatchfaceApp instance;
-  return instance;
-}
-
 void WatchfaceApp::Init() {
   k_work_init_delayable(&general_work_item.work, general_work);
   k_work_init_delayable(&battery_work.work, general_work);

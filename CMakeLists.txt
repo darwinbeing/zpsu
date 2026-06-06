@@ -42,6 +42,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/src/notification
   ${PROJECT_SOURCE_DIR}/src/display
   ${PROJECT_SOURCE_DIR}/src/led
+  ${PROJECT_SOURCE_DIR}/src/common
   )
 
 set(app_SRCS

@@ -1,20 +1,19 @@
 #ifndef LED_LED_HPP_
 #define LED_LED_HPP_
 
+#include "singleton.hpp"
+
 namespace led {
 
-class Led {
+class Led : public common::Singleton<Led> {
+  friend class common::Singleton<Led>;
+
  public:
-  static Led& Instance();
   void Start();
   void Stop();
 
  private:
   Led() = default;
-  Led(const Led&) = delete;
-  Led& operator=(const Led&) = delete;
-  Led(Led&&) = delete;
-  Led& operator=(Led&&) = delete;
 };
 
 }  // namespace led

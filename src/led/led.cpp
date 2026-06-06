@@ -24,11 +24,6 @@ K_TIMER_DEFINE(led_blink_timer, led_blink_timer_cb, NULL);
 
 namespace led {
 
-Led& Led::Instance() {
-  static Led instance;
-  return instance;
-}
-
 void Led::Start() {
   int ret;
 

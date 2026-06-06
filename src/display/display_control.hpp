@@ -3,12 +3,14 @@
 
 #include <cstdint>
 
+#include "singleton.hpp"
+
 namespace display {
 
-class DisplayControl {
- public:
-  static DisplayControl& Instance();
+class DisplayControl : public common::Singleton<DisplayControl> {
+  friend class common::Singleton<DisplayControl>;
 
+ public:
   void Init();
   void PowerOn(bool on);
   void SetBrightness(uint8_t percent);
@@ -16,10 +18,6 @@ class DisplayControl {
 
  private:
   DisplayControl() = default;
-  DisplayControl(const DisplayControl&) = delete;
-  DisplayControl& operator=(const DisplayControl&) = delete;
-  DisplayControl(DisplayControl&&) = delete;
-  DisplayControl& operator=(DisplayControl&&) = delete;
 
   bool is_on_ = false;
   uint8_t last_brightness_ = 80;

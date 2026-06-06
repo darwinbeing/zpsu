@@ -7,14 +7,16 @@
 #include <zephyr/zbus/zbus.h>
 #include <zephyr/bluetooth/conn.h>
 
+#include "singleton.hpp"
+
 namespace app {
 
 // Watchface coordinator: zbus listeners, BT connection callbacks, and the
 // periodic work that drives the watchface UI.
-class WatchfaceApp {
- public:
-  static WatchfaceApp& Instance();
+class WatchfaceApp : public common::Singleton<WatchfaceApp> {
+  friend class common::Singleton<WatchfaceApp>;
 
+ public:
   void Init();                  // SYS_INIT: init work items, running_ = false
   void Start(lv_group_t* group);
   void Stop();
@@ -32,10 +34,6 @@ class WatchfaceApp {
 
  private:
   WatchfaceApp() = default;
-  WatchfaceApp(const WatchfaceApp&) = delete;
-  WatchfaceApp& operator=(const WatchfaceApp&) = delete;
-  WatchfaceApp(WatchfaceApp&&) = delete;
-  WatchfaceApp& operator=(WatchfaceApp&&) = delete;
 
   bool running_ = false;
 };

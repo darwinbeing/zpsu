@@ -31,11 +31,6 @@ void lvgl_render(struct k_work* item) {
 
 namespace display {
 
-DisplayControl& DisplayControl::Instance() {
-  static DisplayControl instance;
-  return instance;
-}
-
 void DisplayControl::Init() {
   if (!device_is_ready(display_dev)) {
     LOG_ERR("Device display not ready.");

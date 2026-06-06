@@ -5,6 +5,8 @@
 
 #include <ble_comm.h>
 
+#include "singleton.hpp"
+
 #define NOTIFICATION_MGR_MAX_FIELD_LEN  50
 #define NOTIFICATION_MANAGER_MAX_STORED 5
 
@@ -24,10 +26,10 @@ typedef struct not_mngr_notification {
 
 namespace notify {
 
-class NotificationManager {
- public:
-  static NotificationManager& Instance();
+class NotificationManager : public common::Singleton<NotificationManager> {
+  friend class common::Singleton<NotificationManager>;
 
+ public:
   void Init();
   not_mngr_notification_t* Add(ble_comm_notify_t* notification);
   int32_t Remove(uint32_t id);
@@ -37,10 +39,6 @@ class NotificationManager {
 
  private:
   NotificationManager() = default;
-  NotificationManager(const NotificationManager&) = delete;
-  NotificationManager& operator=(const NotificationManager&) = delete;
-  NotificationManager(NotificationManager&&) = delete;
-  NotificationManager& operator=(NotificationManager&&) = delete;
 
   uint32_t FindIdx(uint32_t id);
   uint32_t FindFreeIdx();
