@@ -74,6 +74,14 @@ jobs:
           cd ..
           pip install -r zephyrproject/zephyr/scripts/requirements.txt
 
+          # Apply the ST7789 GRAM-clear driver patch (fixes power-up screen
+          # garbage). The fix lives in the Zephyr display driver, which is
+          # fetched fresh by `west update` above, so it must be re-applied on
+          # every CI run. Fails the job if it no longer applies (e.g. the
+          # zephyr_tag changed and the driver diverged) so the patch gets fixed.
+          echo "Applying st7789v_clear_gram.patch to Zephyr"
+          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/st7789v_clear_gram.patch"
+
           arm_none_eabi_gcc_path=${ARM_NONE_EABI_GCC_PATH%/*}
           export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
           export GNUARMEMB_TOOLCHAIN_PATH="$arm_none_eabi_gcc_path"
