@@ -6,7 +6,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "display_control.h"
+#include "display_control.hpp"
 #include "watchface_app.hpp"
 
 LOG_MODULE_REGISTER(app, LOG_LEVEL_WRN);
@@ -71,8 +71,8 @@ void App::InitRgbPwmLed() {
 void App::RunInit() {
   InitRgbPwmLed();
   // psu_service_init() is registered via SYS_INIT() in psu_service.cpp
-  display_control_init();
-  display_control_power_on(true);
+  display::DisplayControl::Instance().Init();
+  display::DisplayControl::Instance().PowerOn(true);
 
   const struct device* lvgl_btn_dev =
       DEVICE_DT_GET(DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_lvgl_button_input));

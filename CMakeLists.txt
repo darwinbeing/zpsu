@@ -40,6 +40,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/src/app
   ${PROJECT_SOURCE_DIR}/src/clock
   ${PROJECT_SOURCE_DIR}/src/notification
+  ${PROJECT_SOURCE_DIR}/src/display
   )
 
 set(app_SRCS
@@ -59,7 +60,7 @@ set(app_SRCS
   ${PROJECT_SOURCE_DIR}/src/notification/notification_manager.cpp
   ${PROJECT_SOURCE_DIR}/src/main.cpp
   ${PROJECT_SOURCE_DIR}/src/app/app.cpp
-  ${PROJECT_SOURCE_DIR}/src/display_control.c
+  ${PROJECT_SOURCE_DIR}/src/display/display_control.cpp
   )
 
 target_sources(app PRIVATE ${app_SRCS})

@@ -26,7 +26,7 @@
 #include <events/chg_event.h>
 #include <events/psuctrl_event.h>
 #include "watchface.hpp"
-#include <display_control.h>   // for lvgl_update(); C++ forbids implicit declaration
+#include "display_control.hpp"
 
 LOG_MODULE_REGISTER(watcface_app, LOG_LEVEL_WRN);
 
@@ -72,7 +72,7 @@ void general_work(struct k_work *item)
         case OPEN_WATCHFACE: {
             app::WatchfaceApp::Instance().set_running(true);
             ui::Watchface::Show();
-            lvgl_update();
+            display::DisplayControl::Instance().LvglUpdate();
             /* __ASSERT(0 <= k_work_schedule(&battery_work.work, K_NO_WAIT), "FAIL battery_work"); */
             /* __ASSERT(0 <= k_work_schedule(&clock_work.work, K_NO_WAIT), "FAIL clock_work"); */
             /* __ASSERT(0 <= k_work_schedule(&date_work.work, K_SECONDS(1)), "FAIL clock_work"); */
@@ -255,7 +255,7 @@ void WatchfaceApp::HandlePsu(const struct zbus_channel* chan) {
   if (running_) {
     struct psuctrl_data_event* event = (struct psuctrl_data_event*)zbus_chan_msg(chan);
     ui::Watchface::SetEnergyPanel(event);
-    lvgl_update();
+    display::DisplayControl::Instance().LvglUpdate();
   }
 }
 
