@@ -41,10 +41,11 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/src/clock
   ${PROJECT_SOURCE_DIR}/src/notification
   ${PROJECT_SOURCE_DIR}/src/display
+  ${PROJECT_SOURCE_DIR}/src/led
   )
 
 set(app_SRCS
-  ${PROJECT_SOURCE_DIR}/src/led.c
+  ${PROJECT_SOURCE_DIR}/src/led/led.cpp
   ${PROJECT_SOURCE_DIR}/src/ui/watchface.cpp
   ${PROJECT_SOURCE_DIR}/src/ui/screens/ui_Screen1.c
   ${PROJECT_SOURCE_DIR}/src/ui/ui_helpers.c
