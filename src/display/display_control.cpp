@@ -27,6 +27,17 @@ void lvgl_render(struct k_work* item) {
   k_work_schedule(&lvgl_work, K_MSEC(next_update_in_ms));
 }
 
+// Backlight is turned on only after the first frame has been painted, so the
+// panel's uninitialized GRAM is never shown as garbage at power-up.
+constexpr uint32_t kBacklightDelayMs = 150;
+
+void backlight_on_work_cb(struct k_work* item);
+K_WORK_DELAYABLE_DEFINE(backlight_on_work, backlight_on_work_cb);
+
+void backlight_on_work_cb(struct k_work* item) {
+  display::DisplayControl::Instance().ShowBacklight();
+}
+
 }  // namespace
 
 namespace display {
@@ -59,7 +70,9 @@ void DisplayControl::PowerOn(bool on) {
       pm_device_action_run(display_dev, PM_DEVICE_ACTION_RESUME);
     }
     display_blanking_off(display_dev);
-    SetBrightness(last_brightness_);
+    // Defer the backlight until the first frame is rendered (avoids showing
+    // uninitialized panel GRAM as garbage on power-up).
+    k_work_schedule(&backlight_on_work, K_MSEC(kBacklightDelayMs));
     k_work_schedule(&lvgl_work, K_MSEC(1));
   } else {
     if (device_is_ready(reg_dev)) {
@@ -68,6 +81,7 @@ void DisplayControl::PowerOn(bool on) {
     } else {
       pm_device_action_run(display_dev, PM_DEVICE_ACTION_SUSPEND);
     }
+    k_work_cancel_delayable(&backlight_on_work);
     SetBrightness(0);
     k_work_cancel_delayable_sync(&lvgl_work, &canel_work_sync);
     lv_obj_invalidate(lv_scr_act());
@@ -99,5 +113,7 @@ void DisplayControl::LvglUpdate() {
   const int64_t next_update_in_ms = lv_task_handler();
   k_work_schedule(&lvgl_work, K_MSEC(next_update_in_ms));
 }
+
+void DisplayControl::ShowBacklight() { SetBrightness(last_brightness_); }
 
 }  // namespace display

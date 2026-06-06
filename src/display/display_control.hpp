@@ -15,6 +15,7 @@ class DisplayControl : public common::Singleton<DisplayControl> {
   void PowerOn(bool on);
   void SetBrightness(uint8_t percent);
   void LvglUpdate();
+  void ShowBacklight();  // enable backlight at last_brightness_ (boot-deferred)
 
  private:
   DisplayControl() = default;
