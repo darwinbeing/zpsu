@@ -13,16 +13,11 @@
 #include <zephyr/logging/log.h>
 #include <lvgl.h>
 #include "clock.hpp"
-#include <battery.h>
-#include <heart_rate_sensor.h>
 #include <accelerometer.h>
-#include <vibration_motor.h>
-#include <ram_retention_storage.h>
 #include <events/ble_data_event.h>
 #include <events/accel_event.h>
 #include "notification_manager.hpp"
 #include <zephyr/zbus/zbus.h>
-#include <zsw_charger.h>
 #include <events/chg_event.h>
 #include <events/psuctrl_event.h>
 #include "watchface.hpp"
@@ -132,43 +127,11 @@ void general_work(struct k_work *item)
     }
 }
 
-/** A discharge curve specific to the power source. */
-static const struct battery_level_point levels[] = {
-    /*
-    Battery supervisor cuts power at 3500mA so treat that as 0%
-    TODO analyze more to get a better curve.
-    */
-    { 10000, 4150 },
-    { 0, 3500 },
-};
-
 int read_battery(int *batt_mV, int *percent)
 {
-#if 0
-    int rc = battery_measure_enable(true);
-    if (rc != 0) {
-        LOG_ERR("Failed initialize battery measurement: %d\n", rc);
-        return -1;
-    }
-    // From https://github.com/zephyrproject-rtos/zephyr/blob/main/samples/boards/nrf/battery/src/main.c
-    *batt_mV = battery_sample();
-
-    if (*batt_mV < 0) {
-        LOG_ERR("Failed to read battery voltage: %d\n", *batt_mV);
-        return -1;
-    }
-
-    unsigned int batt_pptt = battery_level_pptt(*batt_mV, levels);
-
-    LOG_DBG("%d mV; %u pptt\n", *batt_mV, batt_pptt);
-    *percent = batt_pptt / 100;
-
-    rc = battery_measure_enable(false);
-    if (rc != 0) {
-        LOG_ERR("Failed disable battery measurement: %d\n", rc);
-        return -1;
-    }
-#endif
+    /* No battery on a PSU monitor; kept as a stub for the watchface work loop. */
+    ARG_UNUSED(batt_mV);
+    ARG_UNUSED(percent);
     return 0;
 }
 
