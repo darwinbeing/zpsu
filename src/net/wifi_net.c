@@ -22,6 +22,7 @@
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/dhcpv4.h>
 #include <zephyr/net/wifi_mgmt.h>
+#include <zephyr/net/wifi_credentials.h>
 
 /* Optional, gitignored credentials for boot-time auto-connect. */
 #if defined(__has_include)
@@ -41,20 +42,23 @@ LOG_MODULE_REGISTER(wifi_net, LOG_LEVEL_INF);
 static struct net_mgmt_event_callback wifi_cb;
 static struct net_mgmt_event_callback ipv4_cb;
 
-#if defined(WIFI_AUTO_SSID)
-/* Default to WPA2-PSK; override in wifi_creds.h for open/WPA3 networks. */
-#ifndef WIFI_AUTO_SECURITY
+/* Security type for the optional one-time build-time seed only. */
+#if defined(WIFI_AUTO_SSID) && !defined(WIFI_AUTO_SECURITY)
 #define WIFI_AUTO_SECURITY WIFI_SECURITY_TYPE_PSK
 #endif
 
 static void wifi_auto_connect_fn(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(wifi_auto_connect, wifi_auto_connect_fn);
 
+static inline void wifi_auto_connect_retry(void)
+{
+	k_work_reschedule(&wifi_auto_connect, K_MSEC(WIFI_AUTO_RETRY_MS));
+}
+
 static void wifi_auto_connect_fn(struct k_work *work)
 {
 	ARG_UNUSED(work);
 	struct net_if *iface = net_if_get_first_wifi();
-	struct wifi_connect_req_params params = {0};
 	int ret;
 
 	if (iface == NULL) {
@@ -62,39 +66,38 @@ static void wifi_auto_connect_fn(struct k_work *work)
 		return;
 	}
 
-	params.ssid = (const uint8_t *)WIFI_AUTO_SSID;
-	params.ssid_length = sizeof(WIFI_AUTO_SSID) - 1;
-	params.psk = (const uint8_t *)WIFI_AUTO_PSK;
-	params.psk_length = sizeof(WIFI_AUTO_PSK) - 1;
-	params.security = WIFI_AUTO_SECURITY;
-	params.channel = WIFI_CHANNEL_ANY;
-	params.band = WIFI_FREQ_BAND_UNKNOWN;
-	params.mfp = WIFI_MFP_OPTIONAL;
-	params.timeout = SYS_FOREVER_MS;
+	/* First boot: seed the store once from wifi_creds.h if it is empty.
+	 * Runtime `wifi cred add/delete` overrides thereafter. */
+	if (wifi_credentials_is_empty()) {
+#if defined(WIFI_AUTO_SSID)
+		ret = wifi_credentials_set_personal(
+			WIFI_AUTO_SSID, sizeof(WIFI_AUTO_SSID) - 1,
+			WIFI_AUTO_SECURITY, NULL, 0,
+			WIFI_AUTO_PSK, sizeof(WIFI_AUTO_PSK) - 1, 0, 0, 0);
+		if (ret) {
+			LOG_WRN("seed of stored creds failed (%d)", ret);
+		} else {
+			LOG_INF("seeded stored creds from wifi_creds.h");
+		}
+#else
+		LOG_INF("no stored WiFi — provision: "
+			"wifi cred add -s <ssid> -k 1 -p <psk>");
+		return; /* nothing to connect to yet; a runtime `wifi cred add`
+			 * + `wifi connect` (or reboot) brings it up */
+#endif
+	}
 
-	LOG_INF("auto-connecting to \"%s\" ...", WIFI_AUTO_SSID);
-	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+	LOG_INF("connecting to stored network ...");
+	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT_STORED, iface, NULL, 0);
 	if (ret == -EALREADY) {
 		return; /* already connected */
 	}
 	if (ret) {
-		/* e.g. the first join after boot often returns -EAGAIN(-11). */
-		LOG_WRN("auto-connect request failed (%d); retrying in %d ms",
+		LOG_WRN("connect-stored request failed (%d); retrying in %d ms",
 			ret, WIFI_AUTO_RETRY_MS);
 		k_work_reschedule(&wifi_auto_connect, K_MSEC(WIFI_AUTO_RETRY_MS));
 	}
-	/* If the request was accepted but association then fails, the
-	 * CONNECT_RESULT handler reschedules; on success it starts DHCPv4.
-	 */
 }
-
-static inline void wifi_auto_connect_retry(void)
-{
-	k_work_reschedule(&wifi_auto_connect, K_MSEC(WIFI_AUTO_RETRY_MS));
-}
-#else
-static inline void wifi_auto_connect_retry(void) { }
-#endif /* WIFI_AUTO_SSID */
 
 static void wifi_event_handler(struct net_mgmt_event_callback *cb,
 			       uint64_t mgmt_event, struct net_if *iface)
@@ -163,13 +166,10 @@ static int wifi_net_init(void)
 				     NET_EVENT_IPV4_ADDR_ADD);
 	net_mgmt_add_event_callback(&ipv4_cb);
 
-#if defined(WIFI_AUTO_SSID)
-	LOG_INF("WiFi glue ready; auto-connecting to \"%s\" shortly", WIFI_AUTO_SSID);
+	LOG_INF("WiFi glue ready; connecting from stored credentials shortly "
+		"(provision/override: wifi cred add -s <ssid> -k 1 -p <psk>)");
 	/* Give the chip/iface a moment to settle before the first attempt. */
 	k_work_reschedule(&wifi_auto_connect, K_SECONDS(3));
-#else
-	LOG_INF("WiFi glue ready; connect with: wifi connect -s \"<ssid>\" -k 1 -p <psk>");
-#endif
 	return 0;
 }
 
