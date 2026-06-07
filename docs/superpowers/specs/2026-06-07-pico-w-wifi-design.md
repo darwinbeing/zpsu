@@ -1,8 +1,10 @@
 # Pico W (RP2040) WiFi connectivity — design
 
 - Date: 2026-06-07
-- Status: approved (design); implementation pending
-- Branch: `feat/pico-w-wifi`
+- Status: **implemented and verified on hardware** (commit `efd5e7f`, on `main`).
+  See "Implementation notes (as built)" at the end for how the design changed
+  during hardware bring-up.
+- Branch: `feat/pico-w-wifi` (merged to `main`)
 
 ## Context
 
@@ -167,9 +169,57 @@ monitoring run unchanged alongside.
   the project's own `display_blk` label instead of `&pwm_led0` (a no-op on the
   plain Pico). Fixed in `boards/rpi_pico/pico_display_pack2.overlay`.
 
-## Open questions (resolve during implementation)
+## Open questions (resolved during implementation)
 
-- Exact `net_mgmt` event mask constants and whether DHCPv4 is better kicked
-  from the connect-result callback vs. `CONFIG_NET_CONFIG_SETTINGS` auto-init.
-- Final trimmed buffer/stack counts that both fit RAM and pass `net ping`.
-- Whether `wifi_net.c` registers via `SYS_INIT` or a call from `app::App::Start`.
+- `net_mgmt` masks: `NET_EVENT_WIFI_CONNECT_RESULT | NET_EVENT_WIFI_DISCONNECT_RESULT`
+  for the WiFi callback, `NET_EVENT_IPV4_ADDR_ADD` for the address callback.
+  DHCPv4 is kicked from the connect-result callback (not `NET_CONFIG_SETTINGS`).
+- `wifi_net.c` registers via `SYS_INIT(..., APPLICATION, ...)` — no `App::Start`
+  change needed.
+- Final buffer/stack counts: see `wifi.conf` (NET_PKT 6, NET_BUF 12, MAIN 4096,
+  SHELL 3072, NET TX/RX 1536). They fit and pass `net ping`.
+
+## Implementation notes (as built)
+
+The driver/firmware were never the problem — bring-up reads the chip MAC
+(`D8:3A:DD:FE:98:13`) and firmware 7.95.88. Getting a working connection on
+real hardware took four non-obvious fixes (all in commit `efd5e7f`):
+
+1. **WiFi init priority must stay at the default 80.** `airoc_init` (chip
+   bring-up) must run *before* the net-if init (`NET_INIT_PRIO=90`), which
+   reads the chip MAC into the interface link address (`airoc_mgmt_init`).
+   Pushing `CONFIG_WIFI_INIT_PRIORITY` past 90 makes that read fail → link addr
+   `00:00:00:00:00:00` → DHCP stuck in "selecting". (An earlier `=95` override,
+   added while chasing an unrelated USB issue, caused exactly this.)
+
+2. **RAM exhaustion was the real "won't boot".** WiFi + the LVGL watchface +
+   net buffers overran the 264 KB SRAM (~98 % used, ~5 KB free) → heap/buffer
+   corruption → a **warm-reset boot loop** that bypassed the fault handler, so
+   USB-CDC never enumerated (looked like "dead / no serial"). Fix: free ~23 KB
+   with `CONFIG_LV_Z_DOUBLE_VDB=n` (single-buffered LVGL) + a larger object
+   pool (`CONFIG_LV_Z_MEM_POOL_SIZE=80000`); RAM now ~89 %. The RP2040 is near
+   its ceiling with WiFi + the full UI — the **RP2350 / Pico 2 W (520 KB)**
+   would have comfortable headroom if more is needed later.
+
+3. **Logs go over USB-CDC, not RTT.** The target has no J-Link, so RTT logging
+   is invisible. `wifi.conf` routes logs through the shell over USB-CDC
+   (`CONFIG_SHELL_LOG_BACKEND=y`, RTT off). The diagnostic that found the boot
+   loop: temporarily deferring `airoc_init` so USB enumerates first.
+
+4. **First `wifi connect` after boot returns `-EAGAIN` (-11).** WHD first-join
+   transient; `wifi_net.c` retries until it associates.
+
+**Credentials / auto-connect (extends the original "runtime shell" design):**
+`wifi_net.c` also auto-connects at boot and reconnects on link drop, *if* a
+gitignored `src/net/wifi_creds.h` is present (`WIFI_AUTO_SSID`/`WIFI_AUTO_PSK`;
+template `wifi_creds.h.sample`). No credentials enter the committed tree.
+Without that header, behaviour is the original design (manual `wifi connect`).
+
+**Gotchas for future work:**
+- The upstream airoc driver has **no `status` mgmt op**, so `wifi status` always
+  fails — use `net iface` for state/IP.
+- The v4.2.1 `wifi connect` shell syntax is flag-based:
+  `wifi connect -s "<ssid>" -k 1 -p <psk>` (`-k 1` = WPA2-PSK), not positional.
+- Old WiFi firmware can't be swapped in on v4.2.1: firmware ⟺ WHD driver ⟺
+  Zephyr version are locked (rolling `hal_infineon` back fails at CMake configure
+  because the v4.2.1 glue expects the new `COMPONENT_WIFI5` layout).
