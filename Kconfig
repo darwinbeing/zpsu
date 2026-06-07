@@ -22,10 +22,12 @@ menu "ZSPSUMon"
     config APP_FLUSH_BENCH
         bool "Display SPI flush benchmark"
         default n
+        select THREAD_RUNTIME_STATS
         help
-          One-shot benchmark at boot that times display_write() and measures
-          CPU left free during flushes (DMA vs polling). Prints a FLUSH BENCH
-          block over printk. Off by default; enable to re-measure the SPI path.
+          One-shot benchmark at boot that times display_write() and reports
+          CPU left free during flushes from the scheduler's idle accounting
+          (THREAD_RUNTIME_STATS). Prints a FLUSH BENCH block over printk.
+          Off by default; enable to re-measure the SPI path.
 
     config DISPLAY_SPI_PIO_DMA
         bool "Drive the display SPI via PIO + TX-DMA (experimental)"

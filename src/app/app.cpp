@@ -22,16 +22,6 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_WRN);
  * raw flush bandwidth + CPU left free during transfers. */
 namespace {
 
-volatile uint64_t g_bench_spin;
-K_THREAD_STACK_DEFINE(bench_spin_stack, 1024);
-struct k_thread bench_spin_thr;
-
-void BenchSpin(void*, void*, void*) {
-  for (;;) {
-    g_bench_spin++;
-  }
-}
-
 void RunFlushBench() {
   const struct device* disp = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
   if (!device_is_ready(disp)) {
@@ -58,46 +48,40 @@ void RunFlushBench() {
   const int strips = h / rows;
   const int frames = 10;
 
-  /* Low-priority spinner: only advances when the CPU is otherwise idle. */
-  k_tid_t tid = k_thread_create(&bench_spin_thr, bench_spin_stack,
-                                K_THREAD_STACK_SIZEOF(bench_spin_stack),
-                                BenchSpin, nullptr, nullptr, nullptr, 14, 0,
-                                K_NO_WAIT);
-
-  /* Baseline: spins over 200 ms with no flushing (reference for "100% free"). */
-  g_bench_spin = 0;
-  k_sleep(K_MSEC(200));
-  uint64_t base = g_bench_spin;
-
-  /* Timed flush loop. */
-  g_bench_spin = 0;
+  /* Accurate CPU utilisation straight from the scheduler's idle accounting
+   * (CONFIG_THREAD_RUNTIME_STATS). For CPU stats, execution_cycles counts
+   * non-idle + idle (elapsed) and total_cycles counts non-idle (busy), so
+   * CPU-free = (elapsed - busy) / elapsed. No spinner, no baseline guesswork. */
+  k_thread_runtime_stats_t rs0 = {}, rs1 = {};
   uint32_t t0 = k_cycle_get_32();
+  k_thread_runtime_stats_cpu_get(0, &rs0);
+
   for (int f = 0; f < frames; f++) {
     for (int s = 0; s < strips; s++) {
       display_write(disp, 0, s * rows, &desc, buf);
     }
   }
-  uint32_t cyc = k_cycle_get_32() - t0;
-  uint64_t spins = g_bench_spin;
 
-  k_thread_abort(tid);
+  k_thread_runtime_stats_cpu_get(0, &rs1);
+  uint32_t cyc = k_cycle_get_32() - t0;
 
   uint64_t us = k_cyc_to_ns_floor64(cyc) / 1000ULL;
   uint32_t bytes = (uint32_t)frames * strips * w * rows * 2;
   uint64_t kbs = us ? ((uint64_t)bytes * 1000000ULL / us) / 1024ULL : 0;
   uint64_t frame_bytes = (uint64_t)w * h * 2;
   uint64_t frame_us = bytes ? (us * frame_bytes / bytes) : 0;
-  /* CPU free during flush vs the idle baseline rate over the same window. */
-  uint64_t expected = base * us / 200000ULL;
-  uint32_t cpu_free_pct = expected ? (uint32_t)(spins * 100ULL / expected) : 0;
+
+  const uint64_t elapsed = rs1.execution_cycles - rs0.execution_cycles; /* non-idle + idle */
+  const uint64_t busy = rs1.total_cycles - rs0.total_cycles;            /* non-idle */
+  const uint32_t cpu_free_pct =
+      elapsed ? (uint32_t)((elapsed - busy) * 100ULL / elapsed) : 0;
 
   printk("\n==== FLUSH BENCH ====\n");
   printk("xfer=%u bytes in %llu us -> %llu KB/s\n", bytes, us, kbs);
   printk("full-frame %ux%u = %llu.%llu ms (%llu fps cap by flush)\n", w, h,
          frame_us / 1000ULL, (frame_us % 1000ULL) / 100ULL,
          frame_us ? 1000000ULL / frame_us : 0);
-  printk("CPU free during flush ~= %u%% (spins=%llu base200ms=%llu)\n",
-         cpu_free_pct, spins, base);
+  printk("CPU free during flush = %u%% (scheduler idle/elapsed)\n", cpu_free_pct);
   printk("=====================\n\n");
 }
 
