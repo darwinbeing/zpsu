@@ -102,4 +102,9 @@ if(CONFIG_WIFI AND NOT CONFIG_APP_WIFI_AP)
   target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net/wifi_net.c)
 endif()
 
+if(CONFIG_APP_WIFI_AP)
+  target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net/wifi_ap.c)
+  target_include_directories(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net)
+endif()
+
 # add_subdirectory(src/ui)

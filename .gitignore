@@ -82,3 +82,4 @@ dkms.conf
 
 # Local WiFi credentials (boot auto-connect) — never commit
 src/net/wifi_creds.h
+src/net/ap_creds.h

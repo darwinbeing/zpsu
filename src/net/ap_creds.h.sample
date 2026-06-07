@@ -1,0 +1,13 @@
+/* Template for overriding the WiFi AP SSID / passphrase / channel.
+ *
+ * Copy to ap_creds.h (which is gitignored) and edit:
+ *   cp src/net/ap_creds.h.sample src/net/ap_creds.h
+ *
+ * Without ap_creds.h, src/net/wifi_ap.c uses a default SSID of
+ * "zpsu-<last 4 hex of the chip MAC>", passphrase "zpsu1234", channel 6.
+ */
+#pragma once
+
+#define AP_SSID    "zpsu-bench"     /* omit to auto-derive "zpsu-<MAC4>" */
+#define AP_PSK     "zpsu1234"       /* WPA2-PSK; >= 8 chars */
+#define AP_CHANNEL 6                /* 2.4 GHz: 1..11 */
