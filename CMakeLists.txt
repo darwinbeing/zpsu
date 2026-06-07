@@ -103,8 +103,12 @@ if(CONFIG_WIFI AND NOT CONFIG_APP_WIFI_AP)
 endif()
 
 if(CONFIG_APP_WIFI_AP)
-  target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net/wifi_ap.c)
-  target_include_directories(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net)
+  target_sources(app PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/net/wifi_ap.c
+    ${PROJECT_SOURCE_DIR}/src/net/psu_udp.c)
+  target_include_directories(app PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/net
+    ${PROJECT_SOURCE_DIR}/src/psu)
 endif()
 
 # add_subdirectory(src/ui)
