@@ -56,6 +56,25 @@ source ~/zephyrproject/zephyr/zephyr-env.sh
     west build -b rpi_pico/rp2040/w -d build_ap -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=ap.conf
     The AP (zpsu-<MAC4> / zpsu1234, 192.168.4.1) auto-starts at boot; control over UDP :5000 — nc -u 192.168.4.1 5000 then STATUS/ON/OFF/MODE CC/CC 5.0/FAN, or python3 psu_ap_smoke.py
 
+### Runtime WiFi/AP credentials (persist in flash, no rebuild)
+
+Credentials live in NVS (a flash `storage_partition`), so you set them once at
+runtime instead of baking them into the image:
+
+    STA (join your WiFi): over the USB-CDC shell, then reboot —
+      wifi cred add -s "<ssid>" -k 1 -p "<psk>"          (-k 1 = WPA2-PSK)
+      wifi cred list / wifi cred delete -s "<ssid>"       (manage stored networks)
+
+    AP (rename/secure the SoftAP): while joined to the AP, over UDP :5000 —
+      printf 'SETAP <ssid> <psk>\n' | nc -u 192.168.4.1 5000   (psk 8-63 chars)
+      or over the USB-CDC shell:  apset <ssid> <psk>
+    The AP re-enables with the new creds (it drops you — rejoin with them).
+
+Optional build-time seed: a gitignored `src/net/wifi_creds.h` / `src/net/ap_creds.h`
+is written to the store once on first boot when it is empty; runtime changes
+override thereafter. With no seed and nothing stored, the STA waits for a
+`wifi cred add` and the AP falls back to `zpsu-<MAC4>` / `zpsu1234`.
+
 ### Pico W (WiFi STA) boot log + gateway ping
 
 USB-CDC console of the `build_wifi` image (board `rpi_pico/rp2040/w`, Zephyr v4.4.0,
