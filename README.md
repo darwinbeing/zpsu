@@ -53,5 +53,5 @@ source ~/zephyrproject/zephyr/zephyr-env.sh
 
     Pico W RP2040 AP (mutually exclusive with wifi.conf; same one-time blob fetch as above)  
     west build -b rpi_pico/rp2040/w -d build_ap -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=ap.conf
-    Usage: join zpsu-<MAC4> / zpsu1234, then nc -u 192.168.4.1 5000 and send STATUS/ON/OFF/MODE CC/CC 5.0/FAN 3000, or run python3 psu_ap_smoke.py
+    The AP (zpsu-<MAC4> / zpsu1234, 192.168.4.1) auto-starts at boot; control over UDP :5000 — nc -u 192.168.4.1 5000 then STATUS/ON/OFF/MODE CC/CC 5.0/FAN, or python3 psu_ap_smoke.py
 
