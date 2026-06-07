@@ -42,4 +42,14 @@ menu "ZSPSUMon"
           and exposes a tunable clock/gap. When off, the display uses the
           default PL022 + DMA path.
 
+    config APP_WIFI_AP
+        bool "Pico W: WiFi AP mode + UDP PSU control"
+        default n
+        help
+          Opt-in (set by ap.conf): run the Pico W as a WiFi Access Point and
+          expose a small UDP text protocol on :5000 that drives the PSU. Selects
+          the AP glue (src/net/wifi_ap.c) and the UDP server (src/net/psu_udp.c),
+          and excludes the STA glue (src/net/wifi_net.c). Mutually exclusive with
+          the STA wifi.conf build. Default builds are unaffected.
+
 endmenu

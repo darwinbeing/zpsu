@@ -93,10 +93,12 @@ if(CONFIG_DISPLAY_SPI_PIO_DMA)
   target_include_directories(app PRIVATE $ENV{ZEPHYR_BASE}/drivers/spi)
 endif()
 
-# Pico W WiFi connectivity glue — compiled only for the opt-in WiFi build
+# Pico W WiFi connectivity glue — compiled only for the opt-in STA WiFi build
 # (CONFIG_WIFI comes from wifi.conf via -DEXTRA_CONF_FILE). Keeps default
 # rpi_pico / rpi_pico2 builds untouched.
-if(CONFIG_WIFI)
+# Excluded from the AP build (CONFIG_APP_WIFI_AP=y): the AP glue lives in
+# src/net/wifi_ap.c (Task 2); wifi_net.c is the STA-mode glue only.
+if(CONFIG_WIFI AND NOT CONFIG_APP_WIFI_AP)
   target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net/wifi_net.c)
 endif()
 
