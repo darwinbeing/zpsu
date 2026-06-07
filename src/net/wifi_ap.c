@@ -30,6 +30,17 @@
 #  endif
 #endif
 
+#include "ap_config.h"
+
+static K_SEM_DEFINE(ap_restart_sem, 0, 1);
+
+/* Ask the bring-up thread to re-enable the AP with the current ap_config
+ * (called from psu_udp SETAP / the apset shell command). */
+void wifi_ap_request_restart(void)
+{
+	k_sem_give(&ap_restart_sem);
+}
+
 #ifndef AP_PSK
 #define AP_PSK "zpsu1234"
 #endif
@@ -68,7 +79,6 @@ LOG_MODULE_REGISTER(wifi_ap, LOG_LEVEL_INF);
 #define AP_THREAD_PRIO    7      /* PREEMPTIBLE (positive) — must NOT be cooperative */
 
 static struct net_mgmt_event_callback ap_cb;
-static char ap_ssid[WIFI_SSID_MAX_LEN + 1];
 
 /* Assign the static AP address + start the DHCP server on the WiFi iface. */
 static void ap_configure_ip(struct net_if *iface)
@@ -84,7 +94,9 @@ static void ap_configure_ip(struct net_if *iface)
 	}
 	net_if_ipv4_set_netmask_by_addr(iface, &addr, &netmask);
 
-	if (net_dhcpv4_server_start(iface, &pool_base) < 0) {
+	int rc = net_dhcpv4_server_start(iface, &pool_base);
+
+	if (rc < 0 && rc != -EALREADY) {
 		LOG_WRN("DHCPv4 server failed to start (clients need static IP)");
 	} else {
 		LOG_INF("AP up: 192.168.4.1, DHCP pool from 192.168.4.2");
@@ -113,49 +125,64 @@ static void ap_bringup_thread(void *a, void *b, void *c)
 		return;
 	}
 
-#if defined(AP_SSID)
-	(void)snprintf(ap_ssid, sizeof(ap_ssid), "%s", AP_SSID);
-#else
-	struct net_linkaddr *ll = net_if_get_link_addr(iface);
+	static char cur_ssid[CRED_SSID_MAX + 1];
+	static char cur_psk[CRED_PSK_MAX + 1];
 
-	if (ll != NULL && ll->len >= 6) {
-		(void)snprintf(ap_ssid, sizeof(ap_ssid), "zpsu-%02X%02X",
-			       ll->addr[4], ll->addr[5]);
-	} else {
-		(void)snprintf(ap_ssid, sizeof(ap_ssid), "zpsu-0000");
-	}
-#endif
+	for (;;) {
+		/* SSID: stored value, else computed zpsu-<MAC4>. */
+		if (!ap_config_get_ssid(cur_ssid, sizeof(cur_ssid))) {
+			struct net_linkaddr *ll = net_if_get_link_addr(iface);
 
-	params.ssid = (const uint8_t *)ap_ssid;
-	params.ssid_length = strlen(ap_ssid);
-	params.psk = (const uint8_t *)AP_PSK;
-	params.psk_length = sizeof(AP_PSK) - 1;
-	params.security = WIFI_SECURITY_TYPE_PSK;
-	params.channel = AP_CHANNEL;
-	params.band = WIFI_FREQ_BAND_2_4_GHZ;
+			if (ll != NULL && ll->len >= 6) {
+				(void)snprintf(cur_ssid, sizeof(cur_ssid),
+					       "zpsu-%02X%02X",
+					       ll->addr[4], ll->addr[5]);
+			} else {
+				(void)snprintf(cur_ssid, sizeof(cur_ssid),
+					       "zpsu-0000");
+			}
+		}
+		ap_config_get_psk(cur_psk, sizeof(cur_psk));
 
-	for (int attempt = 1; attempt <= AP_MAX_ATTEMPTS; attempt++) {
-		int ret;
+		params.ssid = (const uint8_t *)cur_ssid;
+		params.ssid_length = strlen(cur_ssid);
+		params.psk = (const uint8_t *)cur_psk;
+		params.psk_length = strlen(cur_psk);
+		params.security = WIFI_SECURITY_TYPE_PSK;
+		params.channel = AP_CHANNEL;
+		params.band = WIFI_FREQ_BAND_2_4_GHZ;
 
-		LOG_INF("starting AP \"%s\" on ch %d (attempt %d/%d) ...",
-			ap_ssid, AP_CHANNEL, attempt, AP_MAX_ATTEMPTS);
-		ret = net_mgmt(NET_REQUEST_WIFI_AP_ENABLE, iface, &params,
-			       sizeof(params));
-		if (ret == 0) {
-			/* airoc_mgmt_ap_enable() is synchronous and does NOT raise
-			 * NET_EVENT_WIFI_AP_ENABLE_RESULT (verified in airoc_wifi.c),
-			 * so configure the static IP + DHCP server here, not from an
-			 * event. */
-			ap_configure_ip(iface);
+		bool up = false;
+
+		for (int attempt = 1; attempt <= AP_MAX_ATTEMPTS; attempt++) {
+			int ret;
+
+			LOG_INF("starting AP \"%s\" on ch %d (attempt %d/%d) ...",
+				cur_ssid, AP_CHANNEL, attempt, AP_MAX_ATTEMPTS);
+			ret = net_mgmt(NET_REQUEST_WIFI_AP_ENABLE, iface, &params,
+				       sizeof(params));
+			if (ret == 0) {
+				ap_configure_ip(iface);
+				up = true;
+				break;
+			}
+			LOG_WRN("AP enable failed (%d) on attempt %d/%d", ret,
+				attempt, AP_MAX_ATTEMPTS);
+			k_sleep(K_MSEC(AP_RETRY_MS));
+		}
+		if (!up) {
+			LOG_ERR("AP enable failed after %d attempts; reboot to "
+				"retry", AP_MAX_ATTEMPTS);
 			return;
 		}
-		LOG_WRN("AP enable failed (%d) on attempt %d/%d", ret, attempt,
-			AP_MAX_ATTEMPTS);
+
+		/* Wait for a restart request (SETAP / apset), then re-enable
+		 * with the new creds — on THIS preemptible thread. */
+		k_sem_take(&ap_restart_sem, K_FOREVER);
+		LOG_INF("re-enabling AP with updated creds");
+		(void)net_mgmt(NET_REQUEST_WIFI_AP_DISABLE, iface, NULL, 0);
 		k_sleep(K_MSEC(AP_RETRY_MS));
 	}
-	LOG_ERR("AP enable failed after %d attempts; reboot to retry "
-		"(WLAN core may need a longer settle — raise AP_START_DELAY_MS)",
-		AP_MAX_ATTEMPTS);
 }
 
 K_THREAD_DEFINE(ap_bringup_tid, AP_THREAD_STACK, ap_bringup_thread,

@@ -20,4 +20,7 @@ void ap_config_get_psk(char *out, size_t out_sz);
  * success, -1 on invalid input or storage error. */
 int ap_config_set(const char *ssid, const char *psk);
 
+/* Defined in wifi_ap.c: trigger a live AP re-enable with the current creds. */
+void wifi_ap_request_restart(void);
+
 #endif /* AP_CONFIG_H */
