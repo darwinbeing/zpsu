@@ -14,6 +14,10 @@
 
 LOG_MODULE_REGISTER(psu_service, LOG_LEVEL_WRN);
 
+/* Serializes all high-level PsuController access: the 500 ms poll, the LVGL
+ * UI callbacks, and the UDP command server (CONFIG_APP_WIFI_AP). */
+K_MUTEX_DEFINE(g_cmd_mutex);
+
 ZBUS_CHAN_DECLARE(psuctrl_data_chan);
 
 namespace {
@@ -41,11 +45,13 @@ K_WORK_DELAYABLE_DEFINE(g_poll_work, PollWork);
 void PollWork(struct k_work* work) {
   ARG_UNUSED(work);
 
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
   Controller().ReadMeasurement(&g_measurement);
 
   const int64_t elapsed_ms = k_uptime_delta(&g_last_sample_ms);
   const float power_w = g_measurement.volts * g_measurement.amps;
   g_energy_wh += power_w * elapsed_ms / 1000.0f / 3600.0f;
+  k_mutex_unlock(&g_cmd_mutex);
 
   struct psuctrl_data_event evt = {};
   evt.volts = g_measurement.volts;
@@ -70,7 +76,7 @@ extern "C" void psu_power_toggle_event_cb(lv_event_t* e) {
     return;
   }
   bool enabled;
-  if (Controller().ToggleOutput(&enabled)) {
+  if (psu_cmd_toggle_output(&enabled) == 0) {
     lv_label_set_text(ui_LabelOnOff, enabled ? "ON" : "OFF");
   }
 }
@@ -79,19 +85,19 @@ extern "C" void psu_mode_toggle_event_cb(lv_event_t* e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
     return;
   }
-  psu::OutputMode mode;
-  if (Controller().ToggleMode(&mode)) {
-    lv_label_set_text(ui_LabelCVCC,
-                      mode == psu::OutputMode::kConstantCurrent ? "CC" : "CV");
+  bool now_cc;
+  if (psu_cmd_toggle_mode(&now_cc) == 0) {
+    lv_label_set_text(ui_LabelCVCC, now_cc ? "CC" : "CV");
   }
 }
 
 extern "C" void psu_current_set_event_cb(lv_event_t* e) {
   const lv_event_code_t code = lv_event_get_code(e);
-  float current;
-  if (!Controller().GetConstantCurrent(&current)) {
+  struct psu_status st;
+  if (psu_cmd_get_status(&st) != 0) {
     return;
   }
+  float current = st.cc_amps;
 
   if (code == LV_EVENT_KEY) {
     const uint32_t key = lv_event_get_key(e);
@@ -112,7 +118,7 @@ extern "C" void psu_current_set_event_cb(lv_event_t* e) {
 
   char buf[32];
   snprintf(buf, sizeof(buf), "%.1f", static_cast<double>(current));
-  Controller().SetConstantCurrent(current);
+  psu_cmd_set_current(current);
   lv_label_set_text(ui_lblPsuCc, buf);
 }
 
@@ -135,7 +141,100 @@ extern "C" void psu_ui_init(void) {
 }
 
 extern "C" int psu_set_fan_rpm(int rpm) {
-  return Controller().SetFanRpm(rpm) ? 0 : -1;
+  return psu_cmd_set_fan(rpm);
+}
+
+extern "C" int psu_cmd_toggle_output(bool* now_on) {
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
+  bool enabled;
+  int rc = Controller().ToggleOutput(&enabled) ? 0 : -1;
+  k_mutex_unlock(&g_cmd_mutex);
+  if (rc == 0 && now_on) {
+    *now_on = enabled;
+  }
+  return rc;
+}
+
+extern "C" int psu_cmd_set_output(bool on) {
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
+  bool cur;
+  int rc = -1;
+  if (Controller().GetOutputEnabled(&cur)) {
+    if (cur == on) {
+      rc = 0;
+    } else {
+      bool now;
+      rc = (Controller().ToggleOutput(&now) && now == on) ? 0 : -1;
+    }
+  }
+  k_mutex_unlock(&g_cmd_mutex);
+  return rc;
+}
+
+extern "C" int psu_cmd_toggle_mode(bool* now_cc) {
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
+  psu::OutputMode mode;
+  int rc = Controller().ToggleMode(&mode) ? 0 : -1;
+  k_mutex_unlock(&g_cmd_mutex);
+  if (rc == 0 && now_cc) {
+    *now_cc = (mode == psu::OutputMode::kConstantCurrent);
+  }
+  return rc;
+}
+
+extern "C" int psu_cmd_set_mode(bool cc) {
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
+  psu::OutputMode mode;
+  int rc = -1;
+  if (Controller().GetMode(&mode)) {
+    bool is_cc = (mode == psu::OutputMode::kConstantCurrent);
+    if (is_cc == cc) {
+      rc = 0;
+    } else {
+      psu::OutputMode now;
+      rc = (Controller().ToggleMode(&now) &&
+            (now == psu::OutputMode::kConstantCurrent) == cc) ? 0 : -1;
+    }
+  }
+  k_mutex_unlock(&g_cmd_mutex);
+  return rc;
+}
+
+extern "C" int psu_cmd_set_current(float amps) {
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
+  int rc = Controller().SetConstantCurrent(amps) ? 0 : -1;
+  k_mutex_unlock(&g_cmd_mutex);
+  return rc;
+}
+
+extern "C" int psu_cmd_set_fan(int rpm) {
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
+  int rc = Controller().SetFanRpm(rpm) ? 0 : -1;
+  k_mutex_unlock(&g_cmd_mutex);
+  return rc;
+}
+
+extern "C" int psu_cmd_get_status(struct psu_status* out) {
+  if (out == nullptr) {
+    return -1;
+  }
+  k_mutex_lock(&g_cmd_mutex, K_FOREVER);
+  out->volts = g_measurement.volts;
+  out->amps = g_measurement.amps;
+  out->watts = g_measurement.watts;
+  out->energy_wh = g_energy_wh;
+
+  bool enabled = false;
+  psu::OutputMode mode = psu::OutputMode::kConstantVoltage;
+  float cc = 0.0f;
+  bool ok = Controller().GetOutputEnabled(&enabled) &&
+            Controller().GetMode(&mode) &&
+            Controller().GetConstantCurrent(&cc);
+  out->output_on = enabled;
+  out->mode_cc = (mode == psu::OutputMode::kConstantCurrent);
+  out->cc_amps = cc;
+  k_mutex_unlock(&g_cmd_mutex);
+  return ok ? 0 : -1;
 }
 
 extern "C" int psu_service_init(void) {
