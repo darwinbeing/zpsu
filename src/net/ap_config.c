@@ -124,3 +124,25 @@ int ap_config_set(const char *new_ssid, const char *new_psk)
 	LOG_INF("AP creds updated: ssid=\"%s\"", ssid);
 	return 0;
 }
+
+#include <zephyr/shell/shell.h>
+#include <stdlib.h>
+
+static int cmd_apset(const struct shell *sh, size_t argc, char **argv)
+{
+	/* Usage: apset <ssid> <psk> */
+	if (argc != 3) {
+		shell_print(sh, "usage: apset <ssid> <psk>");
+		return -EINVAL;
+	}
+	if (ap_config_set(argv[1], argv[2]) != 0) {
+		shell_print(sh, "apset: invalid (ssid 1-32, psk 8-63) or store error");
+		return -EINVAL;
+	}
+	shell_print(sh, "apset: stored ssid=\"%s\"; re-enabling AP", argv[1]);
+	wifi_ap_request_restart();
+	return 0;
+}
+
+SHELL_CMD_ARG_REGISTER(apset, NULL,
+		       "Set SoftAP creds: apset <ssid> <psk>", cmd_apset, 3, 0);

@@ -27,6 +27,8 @@
 #include <strings.h>
 
 #include "psu_service.h"
+#include "cred_parse.h"
+#include "ap_config.h"
 
 LOG_MODULE_REGISTER(psu_udp, LOG_LEVEL_INF);
 
@@ -95,7 +97,24 @@ static int handle_cmd(char *line, char *out, size_t outsz)
 	}
 	if (strcasecmp(line, "HELP") == 0) {
 		return snprintf(out, outsz,
-				"STATUS|ON|OFF|MODE CV|MODE CC|CC <a>|FAN <rpm>");
+			"STATUS|ON|OFF|MODE CV|MODE CC|CC <a>|FAN <rpm>|SETAP <ssid> <psk>");
+	}
+	if (strncasecmp(line, "SETAP ", 6) == 0) {
+		char ssid[CRED_SSID_MAX + 1];
+		char psk[CRED_PSK_MAX + 1];
+
+		if (setap_parse(line, ssid, sizeof(ssid), psk, sizeof(psk)) != 0) {
+			return snprintf(out, outsz,
+				"ERR setap (ssid 1-32, psk 8-63)");
+		}
+		if (ap_config_set(ssid, psk) != 0) {
+			return snprintf(out, outsz, "ERR setap store");
+		}
+		/* Reply BEFORE the AP restart drops this client. */
+		int rn = snprintf(out, outsz, "OK SETAP %s (reconnect)", ssid);
+
+		wifi_ap_request_restart();
+		return rn;
 	}
 	return snprintf(out, outsz, "ERR bad command");
 }
@@ -108,7 +127,7 @@ static void psu_udp_thread(void *a, void *b, void *c)
 		.sin_port = htons(PSU_UDP_PORT),
 		.sin_addr.s_addr = htonl(INADDR_ANY),
 	};
-	char buf[64];
+	char buf[128];
 	char reply[96];
 	int sock = -1;
 
