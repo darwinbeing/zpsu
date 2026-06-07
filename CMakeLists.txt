@@ -93,4 +93,11 @@ if(CONFIG_DISPLAY_SPI_PIO_DMA)
   target_include_directories(app PRIVATE $ENV{ZEPHYR_BASE}/drivers/spi)
 endif()
 
+# Pico W WiFi connectivity glue — compiled only for the opt-in WiFi build
+# (CONFIG_WIFI comes from wifi.conf via -DEXTRA_CONF_FILE). Keeps default
+# rpi_pico / rpi_pico2 builds untouched.
+if(CONFIG_WIFI)
+  target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net/wifi_net.c)
+endif()
+
 # add_subdirectory(src/ui)
