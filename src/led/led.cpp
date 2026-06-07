@@ -13,7 +13,12 @@ LOG_MODULE_REGISTER(led_app, LOG_LEVEL_DBG);
 
 namespace {
 
-const struct gpio_dt_spec led_spec = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+/* GET_OR (not GET) so this builds on boards without an onboard led0 — e.g. the
+ * Pico W, where GP25 belongs to the CYW43439 and rpi_pico-led.dtsi is omitted.
+ * The empty fallback spec makes gpio_is_ready_dt() fail in Start(), so the
+ * heartbeat LED is simply a no-op there. Mirrors display_blk in
+ * display_control.cpp; byte-identical behaviour on the plain Pico. */
+const struct gpio_dt_spec led_spec = GPIO_DT_SPEC_GET_OR(LED0_NODE, gpios, {});
 
 void led_blink_timer_cb(struct k_timer* timer_id) {
   gpio_pin_toggle_dt(&led_spec);

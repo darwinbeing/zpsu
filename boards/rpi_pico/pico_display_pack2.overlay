@@ -56,7 +56,12 @@
 	dma-names = "tx", "rx";
 };
 
-&pwm_led0 {
+/* Display backlight PWM. Use this project's own label (display_blk) rather
+ * than &pwm_led0: the latter is defined only by the non-W board's
+ * rpi_pico-led.dtsi, which rpi_pico/rp2040/w does not include. Both labels
+ * name the same /pwm_leds/pwm_led_0 node, so this is a no-op on the plain
+ * Pico and lets the overlay build on the Pico W. */
+&display_blk {
 	status = "okay";
 };
 
