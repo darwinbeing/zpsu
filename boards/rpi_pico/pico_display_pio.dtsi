@@ -1,0 +1,77 @@
+/*
+ * Copyright (c) 2026
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Board DT fragment for the PIO + TX-DMA display SPI path (rpi_pico / RP2040).
+ * Pulled in as an extra DT overlay by CMakeLists.txt only when
+ * CONFIG_DISPLAY_SPI_PIO_DMA=y (the gating happens in CMake, not via #if here:
+ * Zephyr preprocesses the devicetree before Kconfig runs, so CONFIG_* macros
+ * are not yet defined when an overlay is run through the C preprocessor).
+ *
+ * This fragment is panel-agnostic: the display SPI pins (GP18 SCK / GP19 MOSI /
+ * GP17 CS / GP16 DC) are identical on Display Pack 1.0 and Pack 2.0, so the same
+ * fragment serves both packs (it is layered on whichever base pack overlay is
+ * selected).
+ *
+ * It frees GP18/GP19 from the PL022 (&spi0), routes them to PIO0, instantiates
+ * the in-project pio_spi0 controller and repoints &mipi_dbi at it. &dma is left
+ * enabled so the Zephyr dma_rpi_pico driver brings the DMA controller out of
+ * reset, owns the DMA IRQ, and dispatches TX completion to the PIO driver.
+ */
+
+#include <zephyr/dt-bindings/pinctrl/rpi-pico-rp2040-pinctrl.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/clock/rpi_pico_rp2040_clock.h>
+#include <zephyr/dt-bindings/dma/rpi-pico-dma-rp2040.h>
+
+&spi0 {
+	status = "disabled";
+};
+
+&pinctrl {
+	pio0_spi_default: pio0_spi_default {
+		group1 {
+			pinmux = <PIO0_P18>, <PIO0_P19>;
+			drive-strength = <12>;
+			slew-rate = <1>;
+		};
+	};
+};
+
+&pio0 {
+	status = "okay";
+
+	pio_spi0: pio_spi0 {
+		compatible = "zpsu,pico-spi-pio-dma";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clocks = <&clocks RPI_PICO_CLKID_CLK_SYS>;
+		dmas = <&dma 0 RPI_PICO_DMA_SLOT_PIO0_TX0 0>;
+		dma-names = "tx";
+		clk-gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+		mosi-gpios = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+		/* PL022 drove CS in hardware via the SPI0_CSN pinmux; PIO has no
+		 * hardware CS, so drive GP17 as a GPIO chip-select. MIPI-DBI reads
+		 * cs-gpios[panel_reg] from this controller node (st7789v@0 reg=0). */
+		cs-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+		pinctrl-0 = <&pio0_spi_default>;
+		pinctrl-names = "default";
+		gap-cycles = <0>;
+		status = "okay";
+	};
+};
+
+&mipi_dbi {
+	spi-dev = <&pio_spi0>;
+};
+
+/* PIO path SCK. 62.5 MHz (the ST7789's rated max / clk_sys/2) was verified clean;
+ * 50 MHz is used for signal-integrity margin while still ~3x the default. The
+ * 2-cycle TX-only program supports up to clk_sys/2 = 62.5 MHz.
+ * This overrides the shared LCD dtsi's 15.625 MHz, which stays in effect for the
+ * default PL022 path. Do NOT move this into the shared dtsi: continuous PL022-DMA
+ * garbles above ~20.83 MHz (a PL022 RX-path limit; the PIO TX-only path has none). */
+&st7789v {
+	mipi-max-frequency = <50000000>;
+};

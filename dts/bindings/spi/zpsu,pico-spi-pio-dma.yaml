@@ -1,0 +1,29 @@
+# Copyright (c) 2026
+# SPDX-License-Identifier: Apache-2.0
+
+description: ST7789 SPI via RP2040 PIO + TX DMA (write-only)
+
+compatible: "zpsu,pico-spi-pio-dma"
+
+include: ["spi-controller.yaml", "raspberrypi,pico-pio-device.yaml", "reset-device.yaml"]
+
+properties:
+  clk-gpios:
+    type: phandle-array
+    required: true
+    description: Output pin for SPI clock (SCK).
+
+  mosi-gpios:
+    type: phandle-array
+    required: true
+    description: Output pin for MOSI.
+
+  clocks:
+    required: true
+
+  gap-cycles:
+    type: int
+    default: 0
+    description: |
+      Extra PIO delay cycles inserted per byte to give the panel recovery
+      time at high clock. 0 = fully gapless stream.

@@ -27,4 +27,17 @@ menu "ZSPSUMon"
           CPU left free during flushes (DMA vs polling). Prints a FLUSH BENCH
           block over printk. Off by default; enable to re-measure the SPI path.
 
+    config DISPLAY_SPI_PIO_DMA
+        bool "Drive the display SPI via PIO + TX-DMA (experimental)"
+        default n
+        select PINCTRL
+        select PICOSDK_USE_PIO
+        select PICOSDK_USE_CLAIM
+        select PICOSDK_USE_DMA
+        help
+          Replace the PL022 hardware-SPI path with an in-project PIO state
+          machine fed by a single TX DMA channel. Frees the CPU during flush
+          and exposes a tunable clock/gap. When off, the display uses the
+          default PL022 + DMA path.
+
 endmenu

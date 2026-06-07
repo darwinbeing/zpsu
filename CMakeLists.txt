@@ -24,6 +24,23 @@ elseif(CONFIG_PICO_DISPLAY_PACK2 AND BOARD_NAME STREQUAL "rpi_pico2")
   set(DTC_OVERLAY_FILE "boards/rpi_pico2/pico_display_pack2.overlay")
 endif()
 
+# Conditionally layer the PIO+DMA display fragment on top of the base overlay.
+# This must be done from CMake (not via an #if inside the overlay): Zephyr runs
+# the devicetree through the C preprocessor before Kconfig is evaluated, so
+# CONFIG_* macros are not defined during DT preprocessing. The pio dtsi is its
+# own overlay so it is applied after the base one and repoints &mipi_dbi.
+# The PIO fragment is panel-agnostic (the display SPI pins are identical on
+# Pack 1.0 and Pack 2.0), so a single per-board-family fragment is layered on
+# top of whichever pack overlay was selected above.
+if(CONFIG_DISPLAY_SPI_PIO_DMA)
+  if(BOARD_NAME STREQUAL "rpi_pico")
+    list(APPEND DTC_OVERLAY_FILE "boards/rpi_pico/pico_display_pio.dtsi")
+  elseif(BOARD_NAME STREQUAL "rpi_pico2")
+    list(APPEND DTC_OVERLAY_FILE "boards/rpi_pico2/pico_display_pio.dtsi")
+  endif()
+endif()
+
+list(APPEND DTS_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(zpsu-mon)
 
@@ -41,6 +58,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/src/clock
   ${PROJECT_SOURCE_DIR}/src/notification
   ${PROJECT_SOURCE_DIR}/src/display
+  ${PROJECT_SOURCE_DIR}/src/driver
   ${PROJECT_SOURCE_DIR}/src/led
   ${PROJECT_SOURCE_DIR}/src/common
   )
@@ -67,5 +85,12 @@ set(app_SRCS
   )
 
 target_sources(app PRIVATE ${app_SRCS})
+
+if(CONFIG_DISPLAY_SPI_PIO_DMA)
+  target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/driver/spi_pio_dma.c)
+  # spi_context.h is a private header that lives alongside the in-tree SPI
+  # drivers; make it resolvable from our out-of-tree driver.
+  target_include_directories(app PRIVATE $ENV{ZEPHYR_BASE}/drivers/spi)
+endif()
 
 # add_subdirectory(src/ui)
