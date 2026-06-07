@@ -92,6 +92,32 @@ project's `pico_display_pack_leds.dtsi`, so it exists on both boards.
 (Scope note: only the pack2 overlay is fixed, since the WiFi build uses
 `-DCONFIG_PICO_DISPLAY_PACK2=y`. The identical latent issue in `pico_display_pack.overlay` / the `rpi_pico2` overlays is left untouched.)
 
+- [ ] **Step 0b: Make the heartbeat-LED module build on the Pico W**
+
+Same root cause, in C: `src/led/led.cpp` uses `DT_ALIAS(led0)` (the GP25
+onboard LED), an alias defined only by `rpi_pico-led.dtsi` — absent on the W
+board, so `GPIO_DT_SPEC_GET(LED0_NODE, gpios)` fails to compile. Fix with the
+null-safe `_OR` variant the codebase already uses for `display_blk`
+(`display_control.cpp:17`). In `src/led/led.cpp`, change:
+
+```cpp
+const struct gpio_dt_spec led_spec = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+```
+to:
+```cpp
+/* GET_OR (not GET) so this builds on boards without an onboard led0 — e.g. the
+ * Pico W, where GP25 belongs to the CYW43439 and rpi_pico-led.dtsi is omitted.
+ * The empty fallback spec makes gpio_is_ready_dt() fail in Start(), so the
+ * heartbeat LED is simply a no-op there. Mirrors display_blk in
+ * display_control.cpp; byte-identical behaviour on the plain Pico. */
+const struct gpio_dt_spec led_spec = GPIO_DT_SPEC_GET_OR(LED0_NODE, gpios, {});
+```
+The existing `gpio_is_ready_dt(&led_spec)` early-return in `Led::Start()`
+already handles the empty spec, so no other change is needed. (Audit of all
+`DT_ALIAS`/`DT_NODELABEL` uses in `src/` confirms `led0` is the only remaining
+W-board gap; the RGB LEDs, `display_blk`, `i2c0`, and `regulator_3v3_ctrl`
+are all defined on the W board or already use `_OR`/`_OR_NULL`.)
+
 - [ ] **Step 1: Create `wifi.conf`**
 
 Create `wifi.conf` at the repo root. Values are based on Zephyr's validated `samples/net/wifi/shell/prj.conf`, trimmed for RP2040 RAM:
