@@ -105,15 +105,23 @@ int ap_config_set(const char *new_ssid, const char *new_psk)
 	}
 
 	k_mutex_lock(&lock, K_FOREVER);
-	(void)strncpy(ssid, new_ssid, sizeof(ssid) - 1);
-	ssid[sizeof(ssid) - 1] = '\0';
-	(void)strncpy(psk, new_psk, sizeof(psk) - 1);
-	psk[sizeof(psk) - 1] = '\0';
-	seeded = true;
-
-	rc = settings_save_one("ap/ssid", ssid, strlen(ssid));
+	/* Persist first; adopt into RAM only if BOTH keys land in NVS. A
+	 * mid-write flash failure must never leave a mismatched ssid/psk pair,
+	 * which would survive reboots as a silent authentication failure. */
+	rc = settings_save_one("ap/ssid", new_ssid, strlen(new_ssid));
 	if (rc == 0) {
-		rc = settings_save_one("ap/psk", psk, strlen(psk));
+		rc = settings_save_one("ap/psk", new_psk, strlen(new_psk));
+		if (rc != 0) {
+			/* Roll back so the two keys never diverge. */
+			(void)settings_delete("ap/ssid");
+		}
+	}
+	if (rc == 0) {
+		(void)strncpy(ssid, new_ssid, sizeof(ssid) - 1);
+		ssid[sizeof(ssid) - 1] = '\0';
+		(void)strncpy(psk, new_psk, sizeof(psk) - 1);
+		psk[sizeof(psk) - 1] = '\0';
+		seeded = true;
 	}
 	k_mutex_unlock(&lock);
 
