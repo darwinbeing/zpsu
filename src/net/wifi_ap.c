@@ -39,13 +39,36 @@
 
 LOG_MODULE_REGISTER(wifi_ap, LOG_LEVEL_INF);
 
-#define AP_RETRY_MS 5000
+/*
+ * ROOT-CAUSE NOTE (verified on hardware): AP-enable must run from a PREEMPTIBLE
+ * thread, after the CYW43439 WLAN core has settled.
+ *
+ * AP-enable issues a burst of WHD IOCTLs; each waits up to 5 s for the chip's
+ * response, delivered over SPI by the interrupt-driven, high-priority WHD bus
+ * thread. Run from the *cooperative* system workqueue (priority -1, never
+ * preempted once running), that interleaving is starved/misordered and an IOCTL
+ * passes its 5 s timeout — which PERMANENTLY wedges WHD's request/response
+ * pipeline ("send event_msgs(iovar) failed" + "Received a response for a
+ * different IOCTL"). It never recovers, so retrying is futile. The Zephyr
+ * `wifi ap enable` shell command works precisely because it runs on a
+ * preemptible thread. Empirically: cooperative sysworkq wedges at both 3 s and
+ * 20 s; a preemptible call ~20 s in succeeds. So we drive AP-enable from a
+ * dedicated preemptible thread after a settle delay, with only a small bounded
+ * retry (never an unbounded loop).
+ */
+/* Condition-based bring-up: rather than a fixed "settle" delay, start soon and
+ * retry the AP-enable until the WLAN core accepts it (ret == 0). On the
+ * PREEMPTIBLE thread an early attempt SHOULD just fail cleanly while the core
+ * comes up, so a later retry succeeds — no magic delay. Bounded so a genuine
+ * wedge (watch for "event_msgs failed"/"different IOCTL") can't thrash forever. */
+#define AP_START_DELAY_MS 3000   /* first attempt soon after boot */
+#define AP_RETRY_MS       3000   /* gap between attempts while the core comes up */
+#define AP_MAX_ATTEMPTS   12     /* ceiling (~tens of s), then stop — never unbounded */
+#define AP_THREAD_STACK   4096   /* WHD ap-enable call chain is deep */
+#define AP_THREAD_PRIO    7      /* PREEMPTIBLE (positive) — must NOT be cooperative */
 
 static struct net_mgmt_event_callback ap_cb;
 static char ap_ssid[WIFI_SSID_MAX_LEN + 1];
-
-static void ap_bringup_fn(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(ap_bringup, ap_bringup_fn);
 
 /* Assign the static AP address + start the DHCP server on the WiFi iface. */
 static void ap_configure_ip(struct net_if *iface)
@@ -68,15 +91,25 @@ static void ap_configure_ip(struct net_if *iface)
 	}
 }
 
-static void ap_bringup_fn(struct k_work *work)
+#ifdef CONFIG_APP_WIFI_AP_AUTOSTART
+static void ap_bringup_thread(void *a, void *b, void *c)
 {
-	ARG_UNUSED(work);
-	struct net_if *iface = net_if_get_first_wifi();
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
 	struct wifi_connect_req_params params = {0};
-	int ret;
+	struct net_if *iface;
 
+	/* Let the WLAN core settle before the first AP-enable (see ROOT-CAUSE NOTE). */
+	k_sleep(K_MSEC(AP_START_DELAY_MS));
+
+	iface = net_if_get_first_wifi();
+	for (int i = 0; iface == NULL && i < AP_MAX_ATTEMPTS; i++) {
+		k_sleep(K_MSEC(AP_RETRY_MS));
+		iface = net_if_get_first_wifi();
+	}
 	if (iface == NULL) {
-		k_work_reschedule(&ap_bringup, K_MSEC(AP_RETRY_MS));
+		LOG_ERR("no WiFi interface found; AP not started");
 		return;
 	}
 
@@ -101,21 +134,33 @@ static void ap_bringup_fn(struct k_work *work)
 	params.channel = AP_CHANNEL;
 	params.band = WIFI_FREQ_BAND_2_4_GHZ;
 
-	LOG_INF("starting AP \"%s\" on ch %d ...", ap_ssid, AP_CHANNEL);
-	ret = net_mgmt(NET_REQUEST_WIFI_AP_ENABLE, iface, &params, sizeof(params));
-	if (ret) {
-		/* airoc first call can return -EAGAIN(-11); just retry. */
-		LOG_WRN("AP enable failed (%d); retrying in %d ms", ret, AP_RETRY_MS);
-		k_work_reschedule(&ap_bringup, K_MSEC(AP_RETRY_MS));
-		return;
-	}
+	for (int attempt = 1; attempt <= AP_MAX_ATTEMPTS; attempt++) {
+		int ret;
 
-	/* airoc_mgmt_ap_enable() does init_ap/start_ap synchronously and only
-	 * returns 0 once the SoftAP is up; the AIROC driver does NOT raise
-	 * NET_EVENT_WIFI_AP_ENABLE_RESULT (verified in airoc_wifi.c), so configure
-	 * the static IP + DHCP server here rather than from the event handler. */
-	ap_configure_ip(iface);
+		LOG_INF("starting AP \"%s\" on ch %d (attempt %d/%d) ...",
+			ap_ssid, AP_CHANNEL, attempt, AP_MAX_ATTEMPTS);
+		ret = net_mgmt(NET_REQUEST_WIFI_AP_ENABLE, iface, &params,
+			       sizeof(params));
+		if (ret == 0) {
+			/* airoc_mgmt_ap_enable() is synchronous and does NOT raise
+			 * NET_EVENT_WIFI_AP_ENABLE_RESULT (verified in airoc_wifi.c),
+			 * so configure the static IP + DHCP server here, not from an
+			 * event. */
+			ap_configure_ip(iface);
+			return;
+		}
+		LOG_WRN("AP enable failed (%d) on attempt %d/%d", ret, attempt,
+			AP_MAX_ATTEMPTS);
+		k_sleep(K_MSEC(AP_RETRY_MS));
+	}
+	LOG_ERR("AP enable failed after %d attempts; reboot to retry "
+		"(WLAN core may need a longer settle — raise AP_START_DELAY_MS)",
+		AP_MAX_ATTEMPTS);
 }
+
+K_THREAD_DEFINE(ap_bringup_tid, AP_THREAD_STACK, ap_bringup_thread,
+		NULL, NULL, NULL, AP_THREAD_PRIO, 0, 0);
+#endif /* CONFIG_APP_WIFI_AP_AUTOSTART */
 
 static void ap_event_handler(struct net_mgmt_event_callback *cb,
 			     uint64_t mgmt_event, struct net_if *iface)
@@ -142,9 +187,15 @@ static int wifi_ap_init(void)
 				     NET_EVENT_WIFI_AP_DISABLE_RESULT);
 	net_mgmt_add_event_callback(&ap_cb);
 
-	LOG_INF("WiFi AP glue ready; bringing AP up shortly");
-	/* Give the chip/iface a moment to settle (MAC must be read in). */
-	k_work_reschedule(&ap_bringup, K_SECONDS(3));
+#ifdef CONFIG_APP_WIFI_AP_AUTOSTART
+	/* The AP comes up from the dedicated preemptible ap_bringup_tid thread
+	 * (must NOT be the cooperative system workqueue — see ROOT-CAUSE NOTE). */
+	LOG_INF("WiFi AP glue ready; AP coming up in %d s on a preemptible thread",
+		AP_START_DELAY_MS / 1000);
+#else
+	LOG_INF("WiFi AP glue ready; auto-start OFF — bring up manually: "
+		"wifi ap enable -s \"zpsu-test\" -k 1 -p \"zpsu1234\" -c 6");
+#endif
 	return 0;
 }
 

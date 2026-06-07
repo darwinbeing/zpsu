@@ -52,4 +52,15 @@ menu "ZSPSUMon"
           and excludes the STA glue (src/net/wifi_net.c). Mutually exclusive with
           the STA wifi.conf build. Default builds are unaffected.
 
+    config APP_WIFI_AP_AUTOSTART
+        bool "Bring the SoftAP up automatically at boot"
+        depends on APP_WIFI_AP
+        default y
+        help
+          When set, src/net/wifi_ap.c starts the SoftAP from a boot-time work
+          item. Turn OFF (-DCONFIG_APP_WIFI_AP_AUTOSTART=n) to leave the AP down
+          at boot and bring it up manually from the shell
+          (wifi ap enable -s <ssid> -k 1 -p <psk> -c 6) — used to isolate the
+          driver's AP path from the boot-time auto-bringup during debugging.
+
 endmenu
