@@ -1,0 +1,19 @@
+/* Template for boot-time WiFi auto-connect.
+ *
+ * Copy to wifi_creds.h (which is gitignored) and fill in your network:
+ *   cp src/net/wifi_creds.h.sample src/net/wifi_creds.h
+ *
+ * With wifi_creds.h present, src/net/wifi_net.c auto-connects at boot and
+ * retries on the transient first-join failure / on link drops. Without it, the
+ * device boots normally and you connect manually via the shell:
+ *   wifi connect -s "<ssid>" -k 1 -p <psk>
+ */
+#pragma once
+
+#define WIFI_AUTO_SSID "YourSSID"
+#define WIFI_AUTO_PSK  "YourPassword"
+
+/* WPA2-PSK is the default. Override for other networks:
+ *   WPA3 (SAE):    #define WIFI_AUTO_SECURITY WIFI_SECURITY_TYPE_SAE
+ *   open network:  #define WIFI_AUTO_SECURITY WIFI_SECURITY_TYPE_NONE
+ */
