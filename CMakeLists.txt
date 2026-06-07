@@ -40,6 +40,14 @@ if(CONFIG_DISPLAY_SPI_PIO_DMA)
   endif()
 endif()
 
+# Pico W WiFi/AP builds (wifi.conf / ap.conf) need a flash storage partition for
+# NVS-backed Settings. DT is preprocessed before Kconfig, so gate on the conf
+# fragment (a CMake-time -D), not CONFIG_WIFI. These builds are always the
+# rpi_pico/rp2040/w board, where &flash0 / &code_partition exist.
+if("${EXTRA_CONF_FILE}" MATCHES "wifi.conf" OR "${EXTRA_CONF_FILE}" MATCHES "ap.conf")
+  list(APPEND DTC_OVERLAY_FILE "boards/pico_w_storage.overlay")
+endif()
+
 list(APPEND DTS_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(zpsu-mon)
@@ -99,13 +107,16 @@ endif()
 # Excluded from the AP build (CONFIG_APP_WIFI_AP=y): the AP glue lives in
 # src/net/wifi_ap.c (Task 2); wifi_net.c is the STA-mode glue only.
 if(CONFIG_WIFI AND NOT CONFIG_APP_WIFI_AP)
-  target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/net/wifi_net.c)
+  target_sources(app PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/net/wifi_net.c
+    ${PROJECT_SOURCE_DIR}/src/net/persist.c)
 endif()
 
 if(CONFIG_APP_WIFI_AP)
   target_sources(app PRIVATE
     ${PROJECT_SOURCE_DIR}/src/net/wifi_ap.c
-    ${PROJECT_SOURCE_DIR}/src/net/psu_udp.c)
+    ${PROJECT_SOURCE_DIR}/src/net/psu_udp.c
+    ${PROJECT_SOURCE_DIR}/src/net/persist.c)
   target_include_directories(app PRIVATE
     ${PROJECT_SOURCE_DIR}/src/net
     ${PROJECT_SOURCE_DIR}/src/psu)

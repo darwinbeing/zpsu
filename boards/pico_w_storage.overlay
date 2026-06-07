@@ -1,0 +1,20 @@
+/*
+ * Pico W (RP2040 /w) WiFi/AP builds: carve a 64 KB storage_partition from the
+ * top of the 2 MB flash for NVS-backed Settings (runtime WiFi/AP credentials).
+ * The stock rpi_pico flash map is one read-only code-partition spanning all
+ * usable flash; shrink it and add storage at the top. The image is ~1.2 MB, so
+ * it never reaches 0x1f0000. CONFIG_SETTINGS_NVS auto-uses the node labeled
+ * `storage_partition` (no chosen needed).
+ */
+&code_partition {
+	reg = <0x100 (DT_SIZE_M(2) - 0x100 - DT_SIZE_K(64))>;
+};
+
+&flash0 {
+	partitions {
+		storage_partition: partition@1f0000 {
+			label = "storage";
+			reg = <0x001f0000 DT_SIZE_K(64)>;
+		};
+	};
+};
