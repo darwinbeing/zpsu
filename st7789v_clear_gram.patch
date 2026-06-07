@@ -25,8 +25,8 @@ index 084d48a3e54..92d57fb6aab 100644
 +
 +	if (IS_ENABLED(CONFIG_ST7789V_RGB565)) {
 +		pixfmt = PIXEL_FORMAT_RGB_565;
-+	} else if (IS_ENABLED(CONFIG_ST7789V_BGR565)) {
-+		pixfmt = PIXEL_FORMAT_BGR_565;
++	} else if (IS_ENABLED(CONFIG_ST7789V_RGB565X)) {
++		pixfmt = PIXEL_FORMAT_RGB_565X;
 +	} else {
 +		pixfmt = PIXEL_FORMAT_RGB_888;
 +	}

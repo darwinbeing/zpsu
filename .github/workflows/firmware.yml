@@ -6,7 +6,7 @@ on:
       zephyr_tag:
         description: "Zephyr Tag"
         required: true
-        default: "v4.2.1"
+        default: "v4.4.0"
         type: string
       version:
         description: "Release Version"
@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'  # Zephyr v4.4.0 requires Python >= 3.12
       - name: Install GNU Arm Embedded Toolchain - ${{ matrix.gcc }}
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
@@ -71,6 +71,8 @@ jobs:
           west init --mr "${{ inputs.zephyr_tag }}" zephyrproject
           cd zephyrproject
           west update
+          # WiFi/AP (Pico W) images need the AIROC CYW43439 firmware blob.
+          west blobs fetch hal_infineon
           cd ..
           pip install -r zephyrproject/zephyr/scripts/requirements.txt
 
@@ -91,6 +93,10 @@ jobs:
           west build -b rpi_pico -d build_lcd2 -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
           west build -b rpi_pico2/rp2350a/m33 -d build_lcd3 -- -DCONFIG_PICO_DISPLAY_PACK=y -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
           west build -b rpi_pico2/rp2350a/m33 -d build_lcd4 -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
+          # Pico W (RP2040) WiFi STA + SoftAP. No wifi_creds.h/ap_creds.h in CI ->
+          # built-in defaults (manual `wifi connect` / zpsu-<MAC4> AP); no secrets baked in.
+          west build -b rpi_pico/rp2040/w -d build_wifi -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=wifi.conf -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
+          west build -b rpi_pico/rp2040/w -d build_ap -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=ap.conf -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
       - name: Delete existing release and tag
         id: delete-tag-release
         uses: dev-drprasad/delete-tag-and-release@v1.1
@@ -141,5 +147,27 @@ jobs:
           body: ${{ steps.calc_text.outputs.text }}
           file: build_lcd4/zephyr/zephyr.uf2
           asset_name: zpsu_pico2_pdp2.uf2
+          overwrite: true
+          prerelease: ${{ inputs.prerelease }}
+      - name: Upload Release Zpsu PICO W(RP2040) WiFi STA FW
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "${{ env.VERSION }}"
+          release_name: "Release ${{ env.VERSION }}"
+          body: ${{ inputs.text }}
+          file: build_wifi/zephyr/zephyr.uf2
+          asset_name: zpsu_picow_wifi.uf2
+          overwrite: true
+          prerelease: ${{ inputs.prerelease }}
+      - name: Upload Release Zpsu PICO W(RP2040) SoftAP FW
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "${{ env.VERSION }}"
+          release_name: "Release ${{ env.VERSION }}"
+          body: ${{ inputs.text }}
+          file: build_ap/zephyr/zephyr.uf2
+          asset_name: zpsu_picow_ap.uf2
           overwrite: true
           prerelease: ${{ inputs.prerelease }}
