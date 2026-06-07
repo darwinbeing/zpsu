@@ -42,7 +42,7 @@ LOG_MODULE_REGISTER(wifi_ap, LOG_LEVEL_INF);
 #define AP_RETRY_MS 5000
 
 static struct net_mgmt_event_callback ap_cb;
-static char ap_ssid[20];
+static char ap_ssid[WIFI_SSID_MAX_LEN + 1];
 
 static void ap_bringup_fn(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(ap_bringup, ap_bringup_fn);

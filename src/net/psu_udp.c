@@ -62,19 +62,19 @@ static int handle_cmd(char *line, char *out, size_t outsz)
 				st.mode_cc ? "CC" : "CV", (double)st.cc_amps);
 	}
 	if (strcasecmp(line, "ON") == 0) {
-		return snprintf(out, outsz,
+		return snprintf(out, outsz, "%s",
 				psu_cmd_set_output(true) == 0 ? "OK ON" : "ERR psu");
 	}
 	if (strcasecmp(line, "OFF") == 0) {
-		return snprintf(out, outsz,
+		return snprintf(out, outsz, "%s",
 				psu_cmd_set_output(false) == 0 ? "OK OFF" : "ERR psu");
 	}
 	if (strcasecmp(line, "MODE CV") == 0) {
-		return snprintf(out, outsz,
+		return snprintf(out, outsz, "%s",
 				psu_cmd_set_mode(false) == 0 ? "OK MODE CV" : "ERR psu");
 	}
 	if (strcasecmp(line, "MODE CC") == 0) {
-		return snprintf(out, outsz,
+		return snprintf(out, outsz, "%s",
 				psu_cmd_set_mode(true) == 0 ? "OK MODE CC" : "ERR psu");
 	}
 	if (strncasecmp(line, "CC ", 3) == 0) {
@@ -110,17 +110,24 @@ static void psu_udp_thread(void *a, void *b, void *c)
 	};
 	char buf[64];
 	char reply[96];
-	int sock;
+	int sock = -1;
 
-	sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (sock < 0) {
-		LOG_ERR("socket() failed: %d", errno);
-		return;
-	}
-	if (zsock_bind(sock, (struct sockaddr *)&bind_addr, sizeof(bind_addr)) < 0) {
-		LOG_ERR("bind() failed: %d", errno);
-		zsock_close(sock);
-		return;
+	/* Retry socket+bind until they succeed: the net stack / iface may not be
+	 * fully up the instant this thread is first scheduled at boot. */
+	while (sock < 0) {
+		sock = zsock_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (sock < 0) {
+			LOG_WRN("socket() failed: %d; retrying", errno);
+			k_sleep(K_SECONDS(1));
+			continue;
+		}
+		if (zsock_bind(sock, (struct sockaddr *)&bind_addr,
+			       sizeof(bind_addr)) < 0) {
+			LOG_WRN("bind() failed: %d; retrying", errno);
+			zsock_close(sock);
+			sock = -1;
+			k_sleep(K_SECONDS(1));
+		}
 	}
 	LOG_INF("UDP control server on :%d", PSU_UDP_PORT);
 
