@@ -56,9 +56,41 @@ Expected: builds clean (this is the known-good baseline; if this fails, fix the 
 ## Task 1: Opt-in `wifi.conf` fragment — stand up the stack and the shell
 
 **Files:**
+- Modify: `boards/rpi_pico/pico_display_pack2.overlay` (W-board DT compat — see Step 0)
 - Create: `wifi.conf`
 
 This task brings up the heavy/risky part — the WiFi driver, the networking stack, the shell, and the RAM fit — **without any project C code**, so DHCP is exercised manually from the shell. De-risks before Task 2.
+
+- [ ] **Step 0: Make the pack2 overlay build on the Pico W**
+
+The `rpi_pico/rp2040/w` board's `.dts` does **not** include Zephyr's
+`rpi_pico-led.dtsi` (on the Pico W, GP25 belongs to the CYW43439, not an
+onboard LED). That file is the only place the `pwm_led0` label is defined; on
+the plain Pico it happens to alias the same `/pwm_leds/pwm_led_0` node that
+this project labels `display_blk` (the display backlight). So
+`&pwm_led0` in the pack overlay resolves on the non-W board by coincidence but
+is an **undefined label on the W board** → `parse error: undefined node label
+'pwm_led0'`.
+
+Fix: reference the backlight by the project's own portable label. In
+`boards/rpi_pico/pico_display_pack2.overlay`, replace the `&pwm_led0` block
+(near line 59) with:
+
+```dts
+/* Display backlight PWM. Use this project's own label (display_blk) rather
+ * than &pwm_led0: the latter is defined only by the non-W board's
+ * rpi_pico-led.dtsi, which rpi_pico/rp2040/w does not include. Both labels
+ * name the same /pwm_leds/pwm_led_0 node, so this is a no-op on the plain
+ * Pico and lets the overlay build on the Pico W. */
+&display_blk {
+	status = "okay";
+};
+```
+
+Leave the `&pwm_led1` block unchanged — `pwm_led1` is defined by this
+project's `pico_display_pack_leds.dtsi`, so it exists on both boards.
+(Scope note: only the pack2 overlay is fixed, since the WiFi build uses
+`-DCONFIG_PICO_DISPLAY_PACK2=y`. The identical latent issue in `pico_display_pack.overlay` / the `rpi_pico2` overlays is left untouched.)
 
 - [ ] **Step 1: Create `wifi.conf`**
 
@@ -151,10 +183,19 @@ uart:~$ net iface
 ```
 Expected: `wifi` lists subcommands; `wifi scan` lists nearby APs; `wifi connect` reports `Connection requested`/`Connected`; after `net dhcpv4 client start 1`, `net iface` shows an `IPv4 unicast address` that is not `0.0.0.0`. (`1` is the iface index — if `net iface` lists the WiFi iface under a different number, use that.) This proves blobs + driver + stack + RAM all work, independent of any project code.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit** (two commits — the DT fix is a distinct concern)
 
 ```bash
 cd ~/Developer/zpsu_mon
+git add boards/rpi_pico/pico_display_pack2.overlay
+git commit -m "fix(board): reference display_blk so pack2 overlay builds on Pico W
+
+&pwm_led0 is defined only by the non-W rpi_pico-led.dtsi; the
+rpi_pico/rp2040/w target omits it (GP25 is the CYW43439). display_blk
+labels the same backlight node, so this is a no-op on the plain Pico.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+
 git add wifi.conf
 git commit -m "feat(net): opt-in wifi.conf fragment for Pico W (CYW43439)
 

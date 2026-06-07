@@ -161,7 +161,11 @@ monitoring run unchanged alongside.
   was not run; called out in the build steps.
 - **GP25 / onboard LED** is owned by the CYW43 on the Pico W. The project's
   RGB status LEDs are on the Display Pack (PWM), not GP25, so existing LED code
-  is unaffected.
+  is unaffected. Note (found during implementation): the W board's `.dts`
+  omits Zephyr's `rpi_pico-led.dtsi`, so the `pwm_led0` label it defines does
+  not exist on the W board. The pack2 overlay must reference the backlight via
+  the project's own `display_blk` label instead of `&pwm_led0` (a no-op on the
+  plain Pico). Fixed in `boards/rpi_pico/pico_display_pack2.overlay`.
 
 ## Open questions (resolve during implementation)
 
