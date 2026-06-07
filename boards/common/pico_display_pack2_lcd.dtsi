@@ -14,7 +14,13 @@
 	st7789v: st7789v@0 {
 		compatible = "sitronix,st7789v";
 		reg = <0>;
-		mipi-max-frequency = <DT_FREQ_M(48)>;
+		/* DMA keeps SCK gapless, unlike polling which inserted FIFO-refill
+		 * gaps that gave the panel timing margin. PL022 (pclk 125M, prescale 2)
+		 * can only do 125/4=31.25M, 125/6=20.83M, 125/8=15.625M and picks the
+		 * fastest <= this value. Continuous DMA on this HAT garbled at both
+		 * 31.25M (old 48M setting) and 20.83M; 15.625M is the highest verified
+		 * stable rate. Raise only if the panel wiring/connector improves. */
+		mipi-max-frequency = <DT_FREQ_M(16)>;
 		width = <320>;
 		height = <240>;
 		x-offset = <0>;

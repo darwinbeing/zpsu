@@ -13,7 +13,11 @@
         st7789v: st7789v@0 {
             compatible = "sitronix,st7789v";
             reg = <0>;
-            mipi-max-frequency = <DT_FREQ_M(48)>;
+            /* Conservative rate mirroring the pack2 result: continuous DMA
+             * needs a lower SCK than gapped polling. 16M -> 15.625M was the
+             * highest stable rate verified on pack2; unvalidated on this 1.0
+             * panel, so start safe and tune up if it proves solid here. */
+            mipi-max-frequency = <DT_FREQ_M(16)>;
 
             width = <240>;
             height = <135>;

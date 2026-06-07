@@ -19,4 +19,12 @@ menu "ZSPSUMon"
     prompt "Pico Display Pack2"
     default n
 
+    config APP_FLUSH_BENCH
+        bool "Display SPI flush benchmark"
+        default n
+        help
+          One-shot benchmark at boot that times display_write() and measures
+          CPU left free during flushes (DMA vs polling). Prints a FLUSH BENCH
+          block over printk. Off by default; enable to re-measure the SPI path.
+
 endmenu

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <zephyr/dt-bindings/pinctrl/rpi-pico-rp2350a-pinctrl.h>
+#include <zephyr/dt-bindings/dma/rpi-pico-dma-rp2350.h>
 #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 #include <zephyr/dt-bindings/lvgl/lvgl.h>
@@ -41,8 +42,18 @@
 	};
 };
 
+&dma {
+	status = "okay";
+};
+
 &spi0 {
 	status = "okay";
+
+	/* Feed the PL022 TX/RX FIFOs via DMA so frame flushes don't busy-wait
+	 * the CPU. PL022 DMA path requires both tx and rx channels. */
+	dmas = <&dma 0 RPI_PICO_DMA_SLOT_SPI0_TX 0>,
+	       <&dma 1 RPI_PICO_DMA_SLOT_SPI0_RX 0>;
+	dma-names = "tx", "rx";
 };
 
 &pwm_led0 {
