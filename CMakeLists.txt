@@ -116,7 +116,9 @@ if(CONFIG_APP_WIFI_AP)
   target_sources(app PRIVATE
     ${PROJECT_SOURCE_DIR}/src/net/wifi_ap.c
     ${PROJECT_SOURCE_DIR}/src/net/psu_udp.c
-    ${PROJECT_SOURCE_DIR}/src/net/persist.c)
+    ${PROJECT_SOURCE_DIR}/src/net/persist.c
+    ${PROJECT_SOURCE_DIR}/src/net/ap_config.c
+    ${PROJECT_SOURCE_DIR}/src/net/cred_parse.c)
   target_include_directories(app PRIVATE
     ${PROJECT_SOURCE_DIR}/src/net
     ${PROJECT_SOURCE_DIR}/src/psu)
