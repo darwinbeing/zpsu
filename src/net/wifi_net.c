@@ -34,7 +34,7 @@ static void wifi_event_handler(struct net_mgmt_event_callback *cb,
 		const struct wifi_status *status =
 			(const struct wifi_status *)cb->info;
 
-		if (status->status) {
+		if (status->status != 0) {
 			LOG_WRN("WiFi connect failed (status %d)",
 				status->status);
 		} else {
@@ -44,7 +44,10 @@ static void wifi_event_handler(struct net_mgmt_event_callback *cb,
 		break;
 	}
 	case NET_EVENT_WIFI_DISCONNECT_RESULT:
+		/* Release the lease so we don't keep a stale IP; a later
+		 * reconnect re-runs DHCPv4 from the connect handler above. */
 		LOG_INF("WiFi disconnected");
+		net_dhcpv4_stop(iface);
 		break;
 	default:
 		break;
