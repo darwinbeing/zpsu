@@ -78,7 +78,16 @@ jobs:
           # GitHub runner image no longer pre-provides them).
           pip install -r zephyr/scripts/requirements.txt
           # WiFi/AP (Pico W) images need the AIROC CYW43439 firmware blob.
-          west blobs fetch hal_infineon
+          # `west blobs fetch` pulls a large set of Infineon blobs from raw
+          # github URLs that intermittently return 504; retry (it only re-fetches
+          # the blobs still missing) before failing the job.
+          blobs_ok=0
+          for attempt in 1 2 3 4 5; do
+            if west blobs fetch hal_infineon; then blobs_ok=1; break; fi
+            echo "blob fetch attempt $attempt failed (likely transient 504); retrying in 20s..."
+            sleep 20
+          done
+          [ "$blobs_ok" = 1 ] || { echo "ERROR: west blobs fetch failed after 5 attempts"; exit 1; }
           cd ..
 
           # Apply the ST7789 GRAM-clear driver patch (fixes power-up screen
