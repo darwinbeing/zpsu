@@ -1,0 +1,51 @@
+diff --git a/drivers/flash/flash_rpi_pico.c b/drivers/flash/flash_rpi_pico.c
+index bbdfa6024d2..f26799b0d90 100644
+--- a/drivers/flash/flash_rpi_pico.c
++++ b/drivers/flash/flash_rpi_pico.c
+@@ -61,6 +61,26 @@ static int flash_rpi_read(const struct device *dev, off_t offset, void *data, si
+ 	return 0;
+ }
+ 
++/*
++ * Workaround for Zephyr #68728: the SDK sub-page program path
++ * (flash_write_partial -> flash_put_get) infinite-loops on RP2040 with some
++ * flash chips, freezing the MCU (it runs with IRQs locked). The bootrom
++ * full-page program (flash_range_program) is unaffected. So program a partial
++ * (<256 B) write as a full 256-byte page: an erased (0xff) page with the
++ * partial bytes placed at their in-page offset. Programming 0xff clears no
++ * bits, so any bytes already written elsewhere in the page are preserved --
++ * valid because callers (NVS) only ever program currently-erased locations.
++ */
++static void flash_rpi_program_partial(off_t offset, const uint8_t *data, size_t size)
++{
++	off_t page = offset & ~((off_t)PAGE_SIZE - 1);
++	size_t in_page = (size_t)(offset - page);
++
++	memset(flash_ram_buffer, 0xff, PAGE_SIZE);
++	memcpy(flash_ram_buffer + in_page, data, size);
++	flash_range_program(page, flash_ram_buffer, PAGE_SIZE);
++}
++
+ static int flash_rpi_write(const struct device *dev, off_t offset, const void *data, size_t size)
+ {
+ 	uint32_t key;
+@@ -83,8 +103,7 @@ static int flash_rpi_write(const struct device *dev, off_t offset, const void *d
+ 
+ 	if ((offset & (PAGE_SIZE - 1)) > 0) {
+ 		bytes_to_write = MIN(PAGE_SIZE - (offset & (PAGE_SIZE - 1)), size);
+-		memcpy(flash_ram_buffer, data_pointer, bytes_to_write);
+-		flash_write_partial(offset, flash_ram_buffer, bytes_to_write);
++		flash_rpi_program_partial(offset, data_pointer, bytes_to_write);
+ 		data_pointer += bytes_to_write;
+ 		size -= bytes_to_write;
+ 		offset += bytes_to_write;
+@@ -100,8 +119,7 @@ static int flash_rpi_write(const struct device *dev, off_t offset, const void *d
+ 	}
+ 
+ 	if (size > 0) {
+-		memcpy(flash_ram_buffer, data_pointer, size);
+-		flash_write_partial(offset, flash_ram_buffer, size);
++		flash_rpi_program_partial(offset, data_pointer, size);
+ 	}
+ 
+ 	irq_unlock(key);

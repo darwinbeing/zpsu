@@ -84,6 +84,14 @@ jobs:
           echo "Applying st7789v_clear_gram.patch to Zephyr"
           git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/st7789v_clear_gram.patch"
 
+          # Apply the RP2040 flash partial-write fix (Zephyr #68728): the SDK
+          # sub-page program path (flash_write_partial -> flash_put_get)
+          # infinite-loops on the Pico W, freezing the MCU when NVS/Settings
+          # writes a credential. Route partial writes through the bootrom
+          # full-page program instead. Needed by the WiFi/AP runtime-cred store.
+          echo "Applying rp2040_flash_partial_write.patch to Zephyr"
+          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/rp2040_flash_partial_write.patch"
+
           arm_none_eabi_gcc_path=${ARM_NONE_EABI_GCC_PATH%/*}
           export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
           export GNUARMEMB_TOOLCHAIN_PATH="$arm_none_eabi_gcc_path"

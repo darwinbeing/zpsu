@@ -61,6 +61,13 @@ source ~/zephyrproject/zephyr/zephyr-env.sh
 Credentials live in NVS (a flash `storage_partition`), so you set them once at
 runtime instead of baking them into the image:
 
+> **Required Zephyr patch:** `rp2040_flash_partial_write.patch` (applied by CI;
+> apply manually for local builds: `git -C ~/zephyrproject/zephyr apply
+> rp2040_flash_partial_write.patch`). Without it, the stock RP2040 flash driver
+> infinite-loops on the sub-page NVS write (Zephyr #68728) and **freezes the
+> board** the first time a credential is saved.
+
+
     STA (join your WiFi): over the USB-CDC shell, then reboot —
       wifi cred add -s "<ssid>" -k 1 -p "<psk>"          (-k 1 = WPA2-PSK)
       wifi cred list / wifi cred delete -s "<ssid>"       (manage stored networks)
