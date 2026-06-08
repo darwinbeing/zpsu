@@ -39,8 +39,8 @@ jobs:
         # gcc: ['10-2020-q4', 'latest']
     steps:
       - name: Clone Repository
-        uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+        uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'  # Zephyr v4.4.0 requires Python >= 3.12
       - name: Install GNU Arm Embedded Toolchain - ${{ matrix.gcc }}
@@ -120,13 +120,14 @@ jobs:
           west build -b rpi_pico/rp2040/w -d build_wifi -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=wifi.conf -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
           west build -b rpi_pico/rp2040/w -d build_ap -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=ap.conf -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
       - name: Delete existing release and tag
-        id: delete-tag-release
-        uses: dev-drprasad/delete-tag-and-release@v1.1
-        with:
-          tag_name: "${{ env.VERSION }}"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          delete_release: true
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # dev-drprasad/delete-tag-and-release has no Node24 release, so reset
+          # the release/tag with the pre-installed (Node-free) gh CLI instead.
+          gh release delete "${{ env.VERSION }}" --yes --cleanup-tag --repo "${{ github.repository }}" || true
+          gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/${{ env.VERSION }}" || true
       - name: Upload Release Zpsu PICO(RP2040) PICO Display Pack FW
         uses: svenstaro/upload-release-action@v2
         with:
