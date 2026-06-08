@@ -54,7 +54,22 @@ source ~/zephyrproject/zephyr/zephyr-env.sh
 
     Pico W RP2040 AP (mutually exclusive with wifi.conf; same one-time blob fetch as above)  
     west build -b rpi_pico/rp2040/w -d build_ap -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=ap.conf
-    The AP (zpsu-<MAC4> / zpsu1234, 192.168.4.1) auto-starts at boot; control over UDP :5000 — nc -u 192.168.4.1 5000 then STATUS/ON/OFF/MODE CC/CC 5.0/FAN, or python3 psu_ap_smoke.py
+    The AP (zpsu-<MAC4> / zpsu1234, 192.168.4.1) auto-starts at boot; PSU control over
+    UDP :5000 — nc -u 192.168.4.1 5000 then STATUS/ON/OFF/MODE CC/CC 5.0/FAN, or
+    python3 psu_ap_smoke.py
+
+    SoftAP shell commands (over the USB-CDC console):
+      wifi ap enable -s "<ssid>" -k 1 -p "<psk>" -c 6   start the AP (-k 1 = WPA2-PSK)
+      wifi ap disable                                    stop the AP
+      wifi ap status                                     AP state
+      wifi ap stations                                   list connected clients
+      apset <ssid> <psk>                                 persist new AP creds + re-enable
+      printf 'SETAP <ssid> <psk>\n' | nc -u 192.168.4.1 5000   same, over UDP :5000
+
+    KNOWN ISSUE (Zephyr v4.4.0): the Infineon AIROC/WHD 3.3.3 driver rejects the AP
+    channel (`whd_wifi_init_ap` -> `whd_wifi_set_chanspec` fails), so SoftAP bring-up
+    (auto-start and `wifi ap enable`) does not work pending an upstream fix. It worked
+    on v4.2.1. STA mode and the UDP/SETAP control logic are unaffected.
 
 ### Runtime WiFi/AP credentials (persist in flash, no rebuild)
 
