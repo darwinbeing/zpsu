@@ -1,0 +1,37 @@
+diff --git a/whd-expansion/WHD/COMPONENT_WIFI5/src/whd_ap.c b/whd-expansion/WHD/COMPONENT_WIFI5/src/whd_ap.c
+index 9ca3f86..4cd9345 100644
+--- a/whd-expansion/WHD/COMPONENT_WIFI5/src/whd_ap.c
++++ b/whd-expansion/WHD/COMPONENT_WIFI5/src/whd_ap.c
+@@ -417,8 +417,30 @@ whd_result_t whd_wifi_init_ap(whd_interface_t ifp, whd_ssid_t *ssid, whd_securit
+         CHECK_RETURN_WITH_SEMAPHORE(whd_proto_set_iovar(prim_ifp, buffer, 0), &ap->whd_wifi_sleep_flag);
+     }
+ 
+-    /* Set the chanspec */
+-    CHECK_RETURN_WITH_SEMAPHORE(whd_wifi_set_chanspec(ifp, CH20MHZ_CHSPEC(chanspec) ), &ap->whd_wifi_sleep_flag);
++    /* Set the channel.
++     *
++     * LOCAL PATCH (CYW43439 SoftAP fix): the CYW43439 firmware shipped with
++     * hal_infineon (WHDe v1.2.1 / WHD 3.3.3) rejects the "chanspec" iovar in
++     * AP mode with WHD_WLAN_BADCHAN (2020) for every 2.4 GHz channel, so SoftAP
++     * never comes up. The reference cyw43-driver (Raspberry Pi Pico SDK) brings
++     * its SoftAP up by setting the plain channel via the WLC_SET_CHANNEL ioctl
++     * instead, which this firmware accepts. Mirror that for the 43439; keep the
++     * chanspec iovar for every other chip (5 GHz parts need the band/bw bits it
++     * carries).
++     */
++    if (wlan_chip_id == 43439)
++    {
++        data = (uint32_t *)whd_proto_get_ioctl_buffer(whd_driver, &buffer, (uint16_t)sizeof(uint32_t) );
++        CHECK_IOCTL_BUFFER_WITH_SEMAPHORE(data, &ap->whd_wifi_sleep_flag);
++        *data = htod32( (uint32_t)CHSPEC_CHANNEL(chanspec) );
++        CHECK_RETURN_WITH_SEMAPHORE(whd_proto_get_ioctl(prim_ifp, WLC_SET_CHANNEL, buffer, NULL),
++                                    &ap->whd_wifi_sleep_flag);
++    }
++    else
++    {
++        CHECK_RETURN_WITH_SEMAPHORE(whd_wifi_set_chanspec(ifp, CH20MHZ_CHSPEC(chanspec) ),
++                                    &ap->whd_wifi_sleep_flag);
++    }
+ 
+     data = (uint32_t *)whd_proto_get_iovar_buffer(whd_driver, &buffer, (uint16_t)8, "bsscfg:" IOVAR_STR_WSEC);
+     CHECK_IOCTL_BUFFER_WITH_SEMAPHORE(data, &ap->whd_wifi_sleep_flag);

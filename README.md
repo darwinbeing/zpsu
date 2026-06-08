@@ -66,19 +66,24 @@ source ~/zephyrproject/zephyr/zephyr-env.sh
       apset <ssid> <psk>                                 persist new AP creds + re-enable
       printf 'SETAP <ssid> <psk>\n' | nc -u 192.168.4.1 5000   same, over UDP :5000
 
-    KNOWN ISSUE (Zephyr v4.4.0): the Infineon AIROC/WHD 3.3.3 driver rejects the AP
-    channel (`whd_wifi_init_ap` -> `whd_wifi_set_chanspec` fails), so SoftAP bring-up
-    (auto-start and `wifi ap enable`) does not work pending an upstream fix. It worked
-    on v4.2.1. STA mode and the UDP/SETAP control logic are unaffected.
+    SoftAP fix (Zephyr v4.4.0): the Infineon AIROC/WHD 3.3.3 firmware rejects the
+    "chanspec" iovar in AP mode with WHD_WLAN_BADCHAN (2020) on every 2.4 GHz channel
+    (`whd_wifi_init_ap` -> `whd_wifi_set_chanspec`), so SoftAP bring-up failed on
+    v4.4.0 (it worked on v4.2.1/WHD 3.3.2). Fixed by `patches/cyw43439_ap_set_channel.patch`:
+    `whd_wifi_init_ap` now sets the channel via the WLC_SET_CHANNEL ioctl (plain
+    channel number, exactly as the Pico SDK cyw43-driver SoftAP does) for the 43439,
+    instead of the chanspec iovar. Apply for local builds (from this repo root):
+    `git -C ~/zephyrproject/modules/hal/infineon apply "$PWD/patches/cyw43439_ap_set_channel.patch"`
+    (verified on hardware: AP `zpsu-<MAC4>` broadcasts and clients associate).
 
 ### Runtime WiFi/AP credentials (persist in flash, no rebuild)
 
 Credentials live in NVS (a flash `storage_partition`), so you set them once at
 runtime instead of baking them into the image:
 
-> **Required Zephyr patch:** `rp2040_flash_partial_write.patch` (applied by CI;
-> apply manually for local builds: `git -C ~/zephyrproject/zephyr apply
-> rp2040_flash_partial_write.patch`). Without it, the stock RP2040 flash driver
+> **Required Zephyr patch:** `patches/rp2040_flash_partial_write.patch` (applied by CI;
+> apply manually from this repo root: `git -C ~/zephyrproject/zephyr apply
+> "$PWD/patches/rp2040_flash_partial_write.patch"`). Without it, the stock RP2040 flash driver
 > infinite-loops on the sub-page NVS write (Zephyr #68728) and **freezes the
 > board** the first time a credential is saved.
 

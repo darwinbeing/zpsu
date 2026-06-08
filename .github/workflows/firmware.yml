@@ -82,7 +82,7 @@ jobs:
           # every CI run. Fails the job if it no longer applies (e.g. the
           # zephyr_tag changed and the driver diverged) so the patch gets fixed.
           echo "Applying st7789v_clear_gram.patch to Zephyr"
-          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/st7789v_clear_gram.patch"
+          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/patches/st7789v_clear_gram.patch"
 
           # Apply the RP2040 flash partial-write fix (Zephyr #68728): the SDK
           # sub-page program path (flash_write_partial -> flash_put_get)
@@ -90,7 +90,16 @@ jobs:
           # writes a credential. Route partial writes through the bootrom
           # full-page program instead. Needed by the WiFi/AP runtime-cred store.
           echo "Applying rp2040_flash_partial_write.patch to Zephyr"
-          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/rp2040_flash_partial_write.patch"
+          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/patches/rp2040_flash_partial_write.patch"
+
+          # Apply the CYW43439 SoftAP fix: the whd-expansion (WHD 3.3.3) firmware
+          # rejects the "chanspec" iovar in AP mode with WHD_WLAN_BADCHAN (2020),
+          # so SoftAP never comes up on v4.4.0. Set the AP channel via the plain
+          # WLC_SET_CHANNEL ioctl instead (as the Pico SDK cyw43-driver does).
+          # Patches the hal_infineon module (re-fetched by `west update` above),
+          # NOT the zephyr tree. Only affects the WiFi/AP builds.
+          echo "Applying cyw43439_ap_set_channel.patch to hal_infineon"
+          git -C zephyrproject/modules/hal/infineon apply --verbose "$GITHUB_WORKSPACE/patches/cyw43439_ap_set_channel.patch"
 
           arm_none_eabi_gcc_path=${ARM_NONE_EABI_GCC_PATH%/*}
           export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
