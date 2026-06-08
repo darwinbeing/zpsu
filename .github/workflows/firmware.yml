@@ -71,10 +71,15 @@ jobs:
           west init --mr "${{ inputs.zephyr_tag }}" zephyrproject
           cd zephyrproject
           west update
+          # Install Zephyr's Python deps BEFORE fetching blobs: `west blobs` needs
+          # `requests` (its http/git_lfs fetchers) and `jsonschema` (blob manifest
+          # validation). Installing them only afterwards fails the blob fetch with
+          # "No module named 'requests'" / "Missing jsonschema dependency" (the
+          # GitHub runner image no longer pre-provides them).
+          pip install -r zephyr/scripts/requirements.txt
           # WiFi/AP (Pico W) images need the AIROC CYW43439 firmware blob.
           west blobs fetch hal_infineon
           cd ..
-          pip install -r zephyrproject/zephyr/scripts/requirements.txt
 
           # Apply the ST7789 GRAM-clear driver patch (fixes power-up screen
           # garbage). The fix lives in the Zephyr display driver, which is
