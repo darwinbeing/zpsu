@@ -81,11 +81,15 @@ source ~/zephyrproject/zephyr/zephyr-env.sh
 Credentials live in NVS (a flash `storage_partition`), so you set them once at
 runtime instead of baking them into the image:
 
-> **Required Zephyr patch:** `patches/rp2040_flash_partial_write.patch` (applied by CI;
-> apply manually from this repo root: `git -C ~/zephyrproject/zephyr apply
-> "$PWD/patches/rp2040_flash_partial_write.patch"`). Without it, the stock RP2040 flash driver
-> infinite-loops on the sub-page NVS write (Zephyr #68728) and **freezes the
-> board** the first time a credential is saved.
+> **Required patch:** `patches/rp2040_flash_ramfunc.patch` (applied by CI; apply
+> manually from this repo root: `git -C ~/zephyrproject/modules/hal/rpi_pico apply
+> "$PWD/patches/rp2040_flash_ramfunc.patch"`). It fixes the real cause of Zephyr
+> #68728: three `hardware_flash/flash.c` helpers (`flash_wait_ready`,
+> `flash_enable_write`, `flash_put_cmd_addr`) are `static inline` without the RAM
+> attribute, so when the compiler doesn't inline them they sit in XIP flash and are
+> called while XIP is disabled → HardFault → double fault → **MCU lockup** the first
+> time a credential is saved. The patch forces them into RAM
+> (`__no_inline_not_in_flash_func`).
 
 
     STA (join your WiFi): over the USB-CDC shell, then reboot —

@@ -98,13 +98,16 @@ jobs:
           echo "Applying st7789v_clear_gram.patch to Zephyr"
           git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/patches/st7789v_clear_gram.patch"
 
-          # Apply the RP2040 flash partial-write fix (Zephyr #68728): the SDK
-          # sub-page program path (flash_write_partial -> flash_put_get)
-          # infinite-loops on the Pico W, freezing the MCU when NVS/Settings
-          # writes a credential. Route partial writes through the bootrom
-          # full-page program instead. Needed by the WiFi/AP runtime-cred store.
-          echo "Applying rp2040_flash_partial_write.patch to Zephyr"
-          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/patches/rp2040_flash_partial_write.patch"
+          # Apply the RP2040 flash ram-func fix (Zephyr #68728, root cause): three
+          # helpers in hal_rpi_pico hardware_flash/flash.c (flash_wait_ready,
+          # flash_enable_write, flash_put_cmd_addr) are 'static inline' without
+          # __no_inline_not_in_flash_func; when the compiler does not inline them
+          # they land in XIP flash and get called by flash_write_partial_internal
+          # while XIP is disabled -> instruction-fetch HardFault -> double fault
+          # -> CPU lockup (freezes on the first NVS/Settings credential write).
+          # Force them into RAM. Needed by the WiFi/AP runtime-cred store.
+          echo "Applying rp2040_flash_ramfunc.patch to hal_rpi_pico"
+          git -C zephyrproject/modules/hal/rpi_pico apply --verbose "$GITHUB_WORKSPACE/patches/rp2040_flash_ramfunc.patch"
 
           # Apply the CYW43439 SoftAP fix: the whd-expansion (WHD 3.3.3) firmware
           # rejects the "chanspec" iovar in AP mode with WHD_WLAN_BADCHAN (2020),
