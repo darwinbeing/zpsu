@@ -1,0 +1,54 @@
+/*
+ * MCUboot USB-DFU upgrade build (RP2040, 2 MB): a single application slot
+ * (overwrite-in-place) + the RP2040 boot-mode retention region. Shared by the
+ * application image (DTC_OVERLAY_FILE in CMakeLists for any mcuboot board)
+ * and the MCUboot child image (sysbuild/mcuboot.overlay), so both agree on the
+ * flash map AND on the retained boot-mode byte the app sets to request recovery.
+ *
+ * Overrides the board variant's stock dual-slot partitions_2M_sysbuild.dtsi:
+ * the WiFi image (~1.1 MB) cannot fit an 832 KB A/B slot, so we use one ~1.84 MB
+ * slot. No rollback — the un-brickable BOOTSEL ROM is the recovery net.
+ */
+
+/* Shrinks sram0 by 4 B and adds the RetainedMem region + `chosen zephyr,boot-mode`
+ * at 0x20000000 (placed so the bootrom stack does not clobber it). */
+#include <raspberrypi/rp2040-boot-mode-retention.dtsi>
+
+&flash0 {
+	/delete-node/ partitions;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+
+		second_stage_bootloader: partition@0 {
+			label = "second_stage_bootloader";
+			reg = <0x0 0x100>;
+			read-only;
+		};
+
+		/* MCUboot + USB device stack + CDC-ACM + SMP serial recovery.
+		 * ~96 KB. If Task 1 shows the bootloader does not fit, ENLARGE this
+		 * (push slot0_partition up to 0x20000 = 128 KB boot); the single slot
+		 * has slack to give. */
+		boot_partition: partition@100 {
+			label = "mcuboot";
+			reg = <0x100 0x17f00>;
+		};
+
+		/* The only application slot (image-0): ~1.84 MB. */
+		slot0_partition: partition@18000 {
+			label = "image-0";
+			reg = <0x18000 0x1d8000>;
+		};
+
+		/* NVS store for runtime WiFi/AP credentials — same 64 KB @0x1f0000
+		 * as boards/pico_w_storage.overlay, so creds map identically. Unused
+		 * (but harmless) on the non-WiFi upgrade build. */
+		storage_partition: partition@1f0000 {
+			label = "storage";
+			reg = <0x1f0000 DT_SIZE_K(64)>;
+		};
+	};
+};

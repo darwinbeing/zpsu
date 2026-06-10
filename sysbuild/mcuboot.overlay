@@ -1,0 +1,16 @@
+/*
+ * DT overlay applied to the MCUboot child image by sysbuild. Shares the
+ * single-slot flash map + boot-mode retention with the app
+ * (boards/rpi_pico/dfu_singleslot.dtsi), and exposes a USB-CDC ACM port for the
+ * serial-recovery SMP transport (mirrors mcuboot's usb_cdc_acm.overlay).
+ *
+ * The #include is relative to THIS file's directory (C preprocessor rule):
+ * sysbuild/ -> ../boards/rpi_pico/.
+ */
+#include "../boards/rpi_pico/dfu_singleslot.dtsi"
+
+&zephyr_udc0 {
+	cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+};
