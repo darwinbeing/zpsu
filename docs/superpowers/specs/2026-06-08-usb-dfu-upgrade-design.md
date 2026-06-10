@@ -188,3 +188,22 @@ All three triggers call `dfu_enter_recovery()`. Compiled into every upgrade-capa
   app runs is not possible, and a WiFi-driven serial-recovery handoff is a larger effort).
 - Automatic A/B rollback (incompatible with the uniform single-slot choice on 2 MB).
 - Dual-slot on RP2350/4 MB (recorded as a future option only).
+
+## 10. Status / follow-on
+
+Implemented for **RP2040** (the size-constraining, debug-probe-wired target) per
+`docs/superpowers/plans/2026-06-09-usb-dfu-mcuboot-upgrade.md`: sysbuild MCUboot single-slot
++ USB-CDC serial recovery, boot-mode-retention software trigger (shell `dfu`, UDP `DFU`,
+A+Y button hold), all host-build-verified; on-hardware flash/`mcumgr` verification is the
+operator's gate.
+
+**RP2350 (`rpi_pico2/rp2350a/m33/mcuboot`, 4 MB) follow-on** — reuses the *identical*
+mechanism; the only delta is a sibling overlay `boards/rpi_pico2/dfu_singleslot.dtsi`
+(a 4 MB single-slot map + `#include <raspberrypi/rp2350-boot-mode-retention.dtsi>`) and a
+namespaced sysbuild build for that board. No on-metal coverage yet.
+
+**Build-integration note:** a sysbuild child image does not see `BOARD`/`CONFIG_*`/`EXTRA_CONF_FILE`
+before `find_package(Zephyr)`, so the app's overlays/conf are passed namespaced
+(`-Dzpsu_mon_EXTRA_DTC_OVERLAY_FILE=…`, `-Dzpsu_mon_EXTRA_CONF_FILE=…`) rather than via the
+pre-`find_package` CMake gate; `CMakeLists.txt` only gains a post-`find_package`
+`if(CONFIG_BOOTLOADER_MCUBOOT)` block to compile `src/dfu/`.
