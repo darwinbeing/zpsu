@@ -101,6 +101,18 @@ if(CONFIG_DISPLAY_SPI_PIO_DMA)
   target_include_directories(app PRIVATE $ENV{ZEPHYR_BASE}/drivers/spi)
 endif()
 
+# Thin app-side trigger module for the opt-in MCUboot USB-DFU upgrade build.
+# Only compiled when MCUboot is the bootloader (dfu.conf / sysbuild sets this);
+# it references bootmode_set / sys_reboot. Gated on the Kconfig symbol (set
+# after find_package), NOT on BOARD — a sysbuild child image does not see BOARD
+# reliably before find_package. The shell `dfu` command inside dfu.c is further
+# gated on CONFIG_SHELL (present on the WiFi/AP builds). Default builds, which
+# have no MCUboot, never compile this.
+if(CONFIG_BOOTLOADER_MCUBOOT)
+  target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/dfu/dfu.c)
+  target_include_directories(app PRIVATE ${PROJECT_SOURCE_DIR}/src/dfu)
+endif()
+
 # Pico W WiFi connectivity glue — compiled only for the opt-in STA WiFi build
 # (CONFIG_WIFI comes from wifi.conf via -DEXTRA_CONF_FILE). Keeps default
 # rpi_pico / rpi_pico2 builds untouched.
