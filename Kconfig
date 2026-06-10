@@ -63,4 +63,15 @@ menu "ZSPSUMon"
           (wifi ap enable -s <ssid> -k 1 -p <psk> -c 6) — used to isolate the
           driver's AP path from the boot-time auto-bringup during debugging.
 
+    config APP_USB_DFU
+        bool "Software-triggered USB firmware upgrade (reset to BOOTSEL)"
+        default n
+        help
+          Opt-in (set by dfu.conf): compile the src/dfu/ trigger module. A
+          shell `dfu` / UDP `DFU` / A+Y button-hold calls dfu_enter_recovery(),
+          which uses the RP2040 bootrom reset_usb_boot() to drop the device
+          into the USB mask-ROM bootloader (BOOTSEL) — a software-triggered,
+          button-free firmware upgrade (drag a .uf2 / picotool load). No
+          MCUboot, no repartition, no signing. Default builds are unaffected.
+
 endmenu

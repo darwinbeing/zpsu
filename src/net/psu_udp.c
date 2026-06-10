@@ -29,7 +29,7 @@
 #include "psu_service.h"
 #include "cred_parse.h"
 #include "ap_config.h"
-#if defined(CONFIG_BOOTLOADER_MCUBOOT)
+#if defined(CONFIG_APP_USB_DFU)
 #include "dfu.h"
 #include "dfu_cmd.h"
 #endif
@@ -120,11 +120,11 @@ static int handle_cmd(char *line, char *out, size_t outsz)
 		wifi_ap_request_restart();
 		return rn;
 	}
-#if defined(CONFIG_BOOTLOADER_MCUBOOT)
+#if defined(CONFIG_APP_USB_DFU)
 	if (dfu_cmd_is_trigger(line)) {
-		/* Reply BEFORE the deferred reboot drops USB; the upgrade then runs
-		 * inside MCUboot serial recovery (see src/dfu/dfu.c). */
-		int rn = snprintf(out, outsz, "OK DFU (rebooting into recovery)");
+		/* Reply BEFORE the deferred reset drops USB; the device then sits in
+		 * the RP2040 USB BOOTSEL bootloader (see src/dfu/dfu.c). */
+		int rn = snprintf(out, outsz, "OK DFU (entering BOOTSEL)");
 
 		dfu_enter_recovery();
 		return rn;

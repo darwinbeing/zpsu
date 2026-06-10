@@ -1,8 +1,8 @@
 /*
- * USB-DFU upgrade trigger. The single entry point every trigger source
- * (shell `dfu`, UDP `DFU`, the on-device button hold) calls to reboot the
- * device into MCUboot serial recovery. Compiled only into the mcuboot
- * upgrade build (gated in CMakeLists by CONFIG_BOOTLOADER_MCUBOOT).
+ * Software-triggered USB firmware upgrade. The single entry point every trigger
+ * source (shell `dfu`, UDP `DFU`, the on-device A+Y button hold) calls to drop
+ * the device into the RP2040 USB BOOTSEL bootloader for a UF2/picotool upgrade.
+ * Compiled only when CONFIG_APP_USB_DFU is set (opt-in via dfu.conf).
  *
  * Design: docs/superpowers/specs/2026-06-08-usb-dfu-upgrade-design.md
  */
@@ -14,10 +14,10 @@ extern "C" {
 #endif
 
 /*
- * Request a reboot into MCUboot USB serial recovery. Non-blocking: schedules a
- * short (200 ms) delayed work that sets the retention boot-mode flag and warm-
- * reboots, so the caller's reply (UDP datagram / shell line / msgbox repaint)
- * is flushed first. Safe to call from any thread/work context.
+ * Enter the RP2040 USB BOOTSEL bootloader (via the bootrom reset_usb_boot()).
+ * Non-blocking: schedules a short (~200 ms) delayed work so the caller's reply
+ * (UDP datagram / shell line / msgbox repaint) is flushed before USB drops.
+ * Safe to call from any thread/work context.
  */
 void dfu_enter_recovery(void);
 

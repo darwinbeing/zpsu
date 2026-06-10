@@ -101,14 +101,12 @@ if(CONFIG_DISPLAY_SPI_PIO_DMA)
   target_include_directories(app PRIVATE $ENV{ZEPHYR_BASE}/drivers/spi)
 endif()
 
-# Thin app-side trigger module for the opt-in MCUboot USB-DFU upgrade build.
-# Only compiled when MCUboot is the bootloader (dfu.conf / sysbuild sets this);
-# it references bootmode_set / sys_reboot. Gated on the Kconfig symbol (set
-# after find_package), NOT on BOARD — a sysbuild child image does not see BOARD
-# reliably before find_package. The shell `dfu` command inside dfu.c is further
-# gated on CONFIG_SHELL (present on the WiFi/AP builds). Default builds, which
-# have no MCUboot, never compile this.
-if(CONFIG_BOOTLOADER_MCUBOOT)
+# App-side software-triggered USB-DFU module (opt-in via dfu.conf -> CONFIG_APP_USB_DFU).
+# dfu_enter_recovery() uses the RP2040 bootrom reset_usb_boot() to drop into the
+# USB BOOTSEL bootloader (no MCUboot, no reboot dance). The shell `dfu` command
+# inside dfu.c is further gated on CONFIG_SHELL (WiFi/AP builds). Default builds
+# don't set CONFIG_APP_USB_DFU, so they never compile this.
+if(CONFIG_APP_USB_DFU)
   target_sources(app PRIVATE
     ${PROJECT_SOURCE_DIR}/src/dfu/dfu.c
     ${PROJECT_SOURCE_DIR}/src/dfu/dfu_buttons.c)
