@@ -109,7 +109,9 @@ endif()
 # gated on CONFIG_SHELL (present on the WiFi/AP builds). Default builds, which
 # have no MCUboot, never compile this.
 if(CONFIG_BOOTLOADER_MCUBOOT)
-  target_sources(app PRIVATE ${PROJECT_SOURCE_DIR}/src/dfu/dfu.c)
+  target_sources(app PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/dfu/dfu.c
+    ${PROJECT_SOURCE_DIR}/src/dfu/dfu_buttons.c)
   target_include_directories(app PRIVATE ${PROJECT_SOURCE_DIR}/src/dfu)
 endif()
 
