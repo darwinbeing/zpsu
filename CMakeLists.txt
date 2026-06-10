@@ -130,10 +130,14 @@ if(CONFIG_APP_WIFI_AP)
     ${PROJECT_SOURCE_DIR}/src/net/psu_udp.c
     ${PROJECT_SOURCE_DIR}/src/net/persist.c
     ${PROJECT_SOURCE_DIR}/src/net/ap_config.c
-    ${PROJECT_SOURCE_DIR}/src/net/cred_parse.c)
+    ${PROJECT_SOURCE_DIR}/src/net/cred_parse.c
+    # Host-testable DFU verb matcher; psu_udp.c's DFU branch (gated on
+    # CONFIG_BOOTLOADER_MCUBOOT) calls it. Harmless on the plain AP build.
+    ${PROJECT_SOURCE_DIR}/src/dfu/dfu_cmd.c)
   target_include_directories(app PRIVATE
     ${PROJECT_SOURCE_DIR}/src/net
-    ${PROJECT_SOURCE_DIR}/src/psu)
+    ${PROJECT_SOURCE_DIR}/src/psu
+    ${PROJECT_SOURCE_DIR}/src/dfu)
 endif()
 
 # add_subdirectory(src/ui)
