@@ -1,4 +1,15 @@
-# Software Upgrade over USB (MCUboot Serial Recovery) — Design
+# Software Upgrade over USB — Design
+
+> **STATUS (superseded): the MCUboot serial-recovery design below was built then ABANDONED.**
+> On-hardware testing showed MCUboot serial recovery is unworkable on RP2040 (the SoC
+> `rom_bootloader.c` hijacks the retention boot-mode and jumps to the USB mask ROM before
+> MCUboot recovery runs; `sys_reboot`/SYSRESETREQ is also unreliable). The shipped design is
+> **Path A** (implemented in `src/dfu/`, opt-in `CONFIG_APP_USB_DFU`): the app's `dfu` / UDP
+> `DFU` / A+Y trigger calls the RP2040 bootrom `reset_usb_boot()` to drop straight into the
+> USB BOOTSEL bootloader; upgrade via `picotool load` / UF2 drag. No MCUboot, no repartition,
+> no signing; works on the stock build. **See §10 for the rationale, the pivot, and findings.**
+> The sections below are retained for the design history (why USB-DFU, the flash-budget
+> analysis, the trigger entry points — all still valid).
 
 - Date: 2026-06-08
 - Scope: All build variants (lcd1–4, wifi, ap) on `rpi_pico` (RP2040) and `rpi_pico2` (RP2350)

@@ -66,21 +66,16 @@ source ~/zephyrproject/zephyr/zephyr-env.sh
       apset <ssid> <psk>                                 persist new AP creds + re-enable
       printf 'SETAP <ssid> <psk>\n' | nc -u 192.168.4.1 5000   same, over UDP :5000
 
-    Pico W RP2040 USB-DFU upgrade build (MCUboot serial recovery; opt-in --sysbuild)
-    west build --sysbuild -b rpi_pico/rp2040/w/mcuboot -d build_dfu_wifi -- \
-        -Dzpsu_mon_CONFIG_PICO_DISPLAY_PACK2=y \
-        -Dzpsu_mon_EXTRA_CONF_FILE="wifi.conf;dfu.conf" \
-        -Dzpsu_mon_EXTRA_DTC_OVERLAY_FILE="boards/rpi_pico/pico_display_pack2.overlay;boards/rpi_pico/dfu_singleslot.dtsi"
-    First install: west flash -d build_dfu_wifi (debug probe; flashes both images) or
-    BOOTSEL-drag mcuboot.uf2 + a picotool-converted signed-app uf2. Then upgrades are
-    USB-only, no button:
+    Software-triggered USB firmware upgrade (opt-in CONFIG_APP_USB_DFU; no button)
+    west build -b rpi_pico/rp2040/w -d build_dfu -- \
+        -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE="wifi.conf;dfu.conf"
+    Trigger from the running app -> device drops into the RP2040 USB BOOTSEL bootloader
+    (bootrom reset_usb_boot()), then upgrade over USB (no MCUboot/repartition/signing):
       trigger  shell `dfu`  |  UDP `printf 'DFU\n' | nc -u 192.168.4.1 5000`  |  hold A+Y 2 s
-      upload   mcumgr --conntype serial --connstring "dev=<port>,baud=115200" \
-                 image upload build_dfu_wifi/zpsu_mon/zephyr/zephyr.signed.bin
-      boot new mcumgr --conntype serial --connstring "dev=<port>,baud=115200" reset
-    Single application slot (overwrite-in-place; the WiFi image can't fit dual-slot in
-    2 MB), MCUboot dev signing key — production must swap in a private key. Design +
-    partition map + RP2350 follow-on: docs/superpowers/specs/2026-06-08-usb-dfu-upgrade-design.md
+      upgrade  picotool load -x build_dfu/zephyr/zephyr.uf2   (or drag the .uf2 to RPI-RP2)
+    Note: after the flash-reboot the USB-CDC console may need one unplug/replug to
+    re-enumerate on macOS (RP2040+host USB quirk; the upgrade itself always succeeds).
+    Design + findings: docs/superpowers/specs/2026-06-08-usb-dfu-upgrade-design.md
 
     SoftAP fix (Zephyr v4.4.0): the Infineon AIROC/WHD 3.3.3 firmware rejects the
     "chanspec" iovar in AP mode with WHD_WLAN_BADCHAN (2020) on every 2.4 GHz channel

@@ -135,16 +135,9 @@ jobs:
           # built-in defaults (manual `wifi connect` / zpsu-<MAC4> AP); no secrets baked in.
           west build -b rpi_pico/rp2040/w -d build_wifi -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=wifi.conf -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
           west build -b rpi_pico/rp2040/w -d build_ap -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE=ap.conf -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
-          # MCUboot USB-DFU upgrade build (opt-in sysbuild + */mcuboot variant): a
-          # build-only gate proving the upgrade image + bootloader still build. App
-          # overlays/conf are namespaced (-Dzpsu_mon_*) because a sysbuild child does
-          # not see BOARD/EXTRA_CONF_FILE before find_package. imgtool signs the app.
-          pip install imgtool
-          west build --sysbuild -b rpi_pico/rp2040/w/mcuboot -d build_dfu_wifi -- \
-            -Dzpsu_mon_CONFIG_PICO_DISPLAY_PACK2=y \
-            -Dzpsu_mon_EXTRA_CONF_FILE="wifi.conf;dfu.conf" \
-            -Dzpsu_mon_EXTRA_DTC_OVERLAY_FILE="boards/rpi_pico/pico_display_pack2.overlay;boards/rpi_pico/dfu_singleslot.dtsi" \
-            -Dzpsu_mon_EXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
+          # Software-triggered USB-DFU upgrade build (opt-in CONFIG_APP_USB_DFU): a
+          # build gate proving the dfu trigger module still builds on the WiFi target.
+          west build -b rpi_pico/rp2040/w -d build_dfu -- -DCONFIG_PICO_DISPLAY_PACK2=y -DEXTRA_CONF_FILE="wifi.conf;dfu.conf" -DEXTRA_CFLAGS="-DOVP_SCALE_FACTOR=${{ github.event.inputs.ovp_scale_factor }}"
       - name: Delete existing release and tag
         continue-on-error: true
         env:
