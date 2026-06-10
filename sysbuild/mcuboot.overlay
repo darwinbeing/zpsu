@@ -9,6 +9,19 @@
  */
 #include "../boards/rpi_pico/dfu_singleslot.dtsi"
 
+/*
+ * Link the bootloader into the boot partition (with boot2 prepended at 0x0).
+ * The board variant's dts chooses slot0 as the code partition (correct for the
+ * APP), and that wins over MCUboot's own app.overlay here, so MCUboot would
+ * otherwise be mis-linked into slot0. Re-assert boot_partition explicitly; this
+ * overlay is applied last, so it wins.
+ */
+/ {
+	chosen {
+		zephyr,code-partition = &boot_partition;
+	};
+};
+
 &zephyr_udc0 {
 	cdc_acm_uart0 {
 		compatible = "zephyr,cdc-acm-uart";
