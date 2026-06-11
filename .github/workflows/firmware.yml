@@ -123,8 +123,9 @@ jobs:
           # prebuilt dlmalloc calls sysconf(8) (newlib's _SC_PAGESIZE), which
           # Zephyr's enum read as _SC_MAPPED_FILES -> returns 200809 as the
           # "page size" -> first malloc() NULL/k_panic depending on the image
-          # layout. Harmless for newlib-nano builds, required whenever full
-          # newlib is linked (e.g. CONFIG_CPP_EXCEPTIONS).
+          # layout. MANDATORY: prj.conf links full newlib (CONFIG_NEWLIB_LIBC
+          # without nano, for CPP_EXCEPTIONS); without this patch, whether a
+          # WiFi build boots is an _end-address lottery.
           echo "Applying zephyr_sysconf_newlib_abi.patch to Zephyr"
           git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/patches/zephyr_sysconf_newlib_abi.patch"
 
