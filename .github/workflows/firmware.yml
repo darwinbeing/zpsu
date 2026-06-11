@@ -118,6 +118,16 @@ jobs:
           echo "Applying cyw43439_ap_set_channel.patch to hal_infineon"
           git -C zephyrproject/modules/hal/infineon apply --verbose "$GITHUB_WORKSPACE/patches/cyw43439_ap_set_channel.patch"
 
+          # Align Zephyr's POSIX _SC_* numbering with the newlib/picolibc ABI
+          # (Zephyr issue 111011, filed from this project): full newlib's
+          # prebuilt dlmalloc calls sysconf(8) (newlib's _SC_PAGESIZE), which
+          # Zephyr's enum read as _SC_MAPPED_FILES -> returns 200809 as the
+          # "page size" -> first malloc() NULL/k_panic depending on the image
+          # layout. Harmless for newlib-nano builds, required whenever full
+          # newlib is linked (e.g. CONFIG_CPP_EXCEPTIONS).
+          echo "Applying zephyr_sysconf_newlib_abi.patch to Zephyr"
+          git -C zephyrproject/zephyr apply --verbose "$GITHUB_WORKSPACE/patches/zephyr_sysconf_newlib_abi.patch"
+
           arm_none_eabi_gcc_path=${ARM_NONE_EABI_GCC_PATH%/*}
           export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
           export GNUARMEMB_TOOLCHAIN_PATH="$arm_none_eabi_gcc_path"
